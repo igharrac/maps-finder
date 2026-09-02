@@ -29,6 +29,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
+  const [analyzingPlaceId, setAnalyzingPlaceId] = useState<string | null>(null);
 
   const [searching, setSearching] = useState(false);
   const [resolving, setResolving] = useState(false);
@@ -162,6 +163,40 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
     }
   }, []);
 
+  const handleAnalyze = useCallback(async (result: SearchResult) => {
+    if (!result.prospectId) return;
+    setAnalyzingPlaceId(result.place.placeId);
+    setWarnings([]);
+
+    try {
+      const response = await fetch(`/api/prospects/${result.prospectId}/analyze`, {
+        method: 'POST',
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error ?? 'Analyse mislukt.');
+        return;
+      }
+
+      // Een onbereikbare site is geen fout maar een bevinding; die melden we
+      // als waarschuwing en de score wordt gewoon bijgewerkt.
+      if (data.warning) setWarnings([data.warning as string]);
+
+      setResults((current) =>
+        current.map((r) =>
+          r.place.placeId === result.place.placeId
+            ? { ...r, score: data.score, status: 'analyzed', markerStyle: 'interesting' }
+            : r,
+        ),
+      );
+    } catch {
+      setError('Analyse mislukt.');
+    } finally {
+      setAnalyzingPlaceId(null);
+    }
+  }, []);
+
   const visible = useMemo(() => {
     return results.filter((r) => {
       if (r.score.opportunityScore < filters.minScore) return false;
@@ -230,9 +265,11 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           totalBeforeFilter={results.length}
           selectedPlaceId={selectedPlaceId}
           savingPlaceId={savingPlaceId}
+          analyzingPlaceId={analyzingPlaceId}
           onSelect={setSelectedPlaceId}
           onHover={setHoveredPlaceId}
           onSave={handleSave}
+          onAnalyze={handleAnalyze}
         />
       </div>
     </div>

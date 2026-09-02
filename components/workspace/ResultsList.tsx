@@ -7,9 +7,11 @@ type Props = {
   totalBeforeFilter: number;
   selectedPlaceId: string | null;
   savingPlaceId: string | null;
+  analyzingPlaceId: string | null;
   onSelect: (placeId: string | null) => void;
   onHover: (placeId: string | null) => void;
   onSave: (result: SearchResult) => void;
+  onAnalyze: (result: SearchResult) => void;
 };
 
 function scoreClasses(score: number): string {
@@ -27,9 +29,11 @@ export function ResultsList({
   totalBeforeFilter,
   selectedPlaceId,
   savingPlaceId,
+  analyzingPlaceId,
   onSelect,
   onHover,
   onSave,
+  onAnalyze,
 }: Props) {
   return (
     <section
@@ -155,6 +159,21 @@ export function ResultsList({
                       ? 'Bezig…'
                       : 'Opslaan'}
                 </button>
+                {result.prospectId ? (
+                  <button
+                    type="button"
+                    onClick={() => onAnalyze(result)}
+                    disabled={analyzingPlaceId === result.place.placeId || !result.place.websiteUri}
+                    title={
+                      result.place.websiteUri
+                        ? 'Haalt de website op en zoekt naar signalen'
+                        : 'Geen website bekend bij Google'
+                    }
+                    className="rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2 hover:border-line-strong disabled:opacity-50"
+                  >
+                    {analyzingPlaceId === result.place.placeId ? 'Analyseren…' : 'Analyseer site'}
+                  </button>
+                ) : null}
                 <a
                   href={`https://www.google.com/maps/place/?q=place_id:${result.place.placeId}`}
                   target="_blank"
