@@ -46,6 +46,22 @@ const REVIEW_MARKERS = [
   'klantenvertellen',
 ];
 
+/**
+ * Oprichtingsjaar staat nergens in Google Places — dat veld bestaat daar niet.
+ * Het enige wat we kunnen doen is kijken of het bedrijf het zelf op zijn site
+ * zet, en dat doen Nederlandse MKB-bedrijven verrassend vaak: "sinds 1987",
+ * "al ruim 40 jaar". Dat is zelfgerapporteerd en dus geen registergegeven; de
+ * zekerheid blijft navenant bescheiden.
+ */
+const FOUNDED_YEAR_PATTERNS = [
+  /(?:sinds|since|opgericht\s+in|gestart\s+in|bestaat\s+sinds|actief\s+sinds)\s*:?\s*(1[89]\d{2}|20[0-4]\d)/i,
+];
+
+const FOUNDED_AGE_PATTERNS = [
+  /al\s+(?:ruim\s+|meer\s+dan\s+|bijna\s+)?(\d{1,3})\s*jaar/i,
+  /(\d{1,3})\s*jaar\s+(?:ervaring|actief|vakmanschap)/i,
+];
+
 const CMS_FINGERPRINTS: Array<[RegExp, string]> = [
   [/wp-content|wp-includes|wordpress/i, 'WordPress'],
   [/cdn\.shopify\.com|shopify/i, 'Shopify'],
@@ -178,6 +194,51 @@ export function detectSignals(page: PageInput): Signal[] {
         Math.max(0, 1 - age / 6),
         // Een copyrightjaartal is een zwakke indicator; vaak staat het vast.
         0.55,
+      ),
+    );
+  }
+
+  // --- hoe lang bestaat het bedrijf ----------------------------------------
+  const currentYearNow = new Date().getFullYear();
+  let founded: number | null = null;
+
+  for (const pattern of FOUNDED_YEAR_PATTERNS) {
+    const match = pattern.exec(text);
+    if (match) {
+      const year = Number(match[1]);
+      if (year >= 1850 && year <= currentYearNow) {
+        founded = year;
+        break;
+      }
+    }
+  }
+
+  if (founded === null) {
+    for (const pattern of FOUNDED_AGE_PATTERNS) {
+      const match = pattern.exec(text);
+      if (match) {
+        const years = Number(match[1]);
+        if (years >= 1 && years <= 200) {
+          founded = currentYearNow - years;
+          break;
+        }
+      }
+    }
+  }
+
+  if (founded !== null) {
+    const age = currentYearNow - founded;
+    signals.push(
+      fact(
+        'founded_year',
+        age <= 3
+          ? `Bestaat sinds ${founded} — nog geen ${age + 1} jaar`
+          : `Bestaat sinds ${founded} — ${age} jaar actief`,
+        { year: founded, ageYears: age, young: age <= 3, established: age >= 20 },
+        null,
+        // Zelfgerapporteerd en uit lopende tekst gehaald; goed genoeg om te
+        // tonen, niet om een score op te bouwen.
+        0.6,
       ),
     );
   }

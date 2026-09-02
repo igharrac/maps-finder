@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
 import {
+  foundedInfo,
   MARKER_APPEARANCE,
   STATUS_LABELS,
   type MarkerStyleKey,
@@ -309,10 +310,18 @@ export function ProspectMap({
             <span className="ml-auto font-medium">{STATUS_LABELS[tooltip.result.status]}</span>
           </div>
 
+          {(() => {
+            const founded = foundedInfo(tooltip.result.score.signals);
+            if (!founded) return null;
+            return (
+              <p className="mt-1.5 text-[11px] font-medium text-accent">{founded.label}</p>
+            );
+          })()}
+
           {tooltip.result.score.signals.filter((s) => s.kind === 'fact').length ? (
             <ul className="mt-2 flex flex-col gap-1 border-t border-surface-2 pt-2">
               {tooltip.result.score.signals
-                .filter((s) => s.kind === 'fact')
+                .filter((s) => s.kind === 'fact' && s.key !== 'founded_year')
                 .slice(0, 3)
                 .map((signal) => (
                   <li key={signal.key} className="text-[11px] leading-snug text-ink-2">

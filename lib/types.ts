@@ -133,3 +133,25 @@ export const MARKER_APPEARANCE: Record<MarkerStyleKey, MarkerAppearance> = {
   flyer_delivered: { color: '#6E7B85', shape: 'check', label: 'Flyer bezorgd' },
   responded: { color: '#C2410C', shape: 'bubble', label: 'Gereageerd' },
 };
+
+/**
+ * Leest het oprichtingsjaar uit de signalen, als het bedrijf dat zelf op zijn
+ * site zet. Google levert dit veld niet, dus dit is er alleen na een analyse en
+ * lang niet bij elk bedrijf.
+ */
+export function foundedInfo(
+  signals: Array<{ key: string; value: unknown }>,
+): { label: string; young: boolean; established: boolean } | null {
+  const signal = signals.find((s) => s.key === 'founded_year');
+  const value = signal?.value as
+    | { year?: number; ageYears?: number; young?: boolean; established?: boolean }
+    | undefined;
+
+  if (!value?.year || typeof value.ageYears !== 'number') return null;
+
+  return {
+    label: value.ageYears <= 3 ? `Sinds ${value.year}` : `${value.ageYears} jaar actief`,
+    young: value.young === true,
+    established: value.established === true,
+  };
+}

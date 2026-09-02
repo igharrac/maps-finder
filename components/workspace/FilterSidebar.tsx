@@ -1,6 +1,7 @@
 'use client';
 
-import { CATEGORY_GROUPS } from '@/lib/categories';
+import { useState } from 'react';
+import { PRIMARY_GROUPS, SECONDARY_GROUPS } from '@/lib/categories';
 import { MARKER_APPEARANCE, MARKER_ORDER, type MarkerStyleKey } from '@/lib/types';
 
 export type Filters = {
@@ -43,6 +44,27 @@ function toggle<T>(list: T[], value: T): T[] {
 }
 
 export function FilterSidebar({ filters, counts, onChange }: Props) {
+  const [showMore, setShowMore] = useState(
+    () => SECONDARY_GROUPS.some((g) => filters.categoryIds.includes(g.id)),
+  );
+
+  const groupCheckbox = (group: { id: string; label: string }) => (
+    <label key={group.id} className="flex cursor-pointer items-center gap-2.5 text-xs">
+      <input
+        type="checkbox"
+        checked={filters.categoryIds.includes(group.id)}
+        onChange={() => onChange({ ...filters, categoryIds: toggle(filters.categoryIds, group.id) })}
+        className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+      />
+      <span>{group.label}</span>
+      {counts[group.id] ? (
+        <span className="ml-auto text-[11px] text-ink-3">{counts[group.id]}</span>
+      ) : null}
+    </label>
+  );
+
+  const extraSelected = SECONDARY_GROUPS.filter((g) => filters.categoryIds.includes(g.id)).length;
+
   return (
     <aside className="flex w-70 shrink-0 flex-col overflow-y-auto border-r border-line bg-surface">
       <div className="flex items-center justify-between px-4 pb-3 pt-4">
@@ -61,22 +83,41 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
           <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
             Branche
           </legend>
-          {CATEGORY_GROUPS.map((group) => (
-            <label key={group.id} className="flex cursor-pointer items-center gap-2.5 text-xs">
-              <input
-                type="checkbox"
-                checked={filters.categoryIds.includes(group.id)}
-                onChange={() =>
-                  onChange({ ...filters, categoryIds: toggle(filters.categoryIds, group.id) })
-                }
-                className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-              />
-              <span>{group.label}</span>
-              {counts[group.id] ? (
-                <span className="ml-auto text-[11px] text-ink-3">{counts[group.id]}</span>
-              ) : null}
-            </label>
-          ))}
+          {PRIMARY_GROUPS.map(groupCheckbox)}
+
+          <button
+            type="button"
+            onClick={() => setShowMore((open) => !open)}
+            aria-expanded={showMore}
+            className="mt-0.5 flex items-center gap-1.5 self-start text-[11px] font-medium text-accent hover:text-accent-dark"
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+              style={{ transform: showMore ? 'rotate(180deg)' : undefined }}
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+            {showMore ? 'Minder branches' : 'Meer branches'}
+            {!showMore && extraSelected > 0 ? (
+              <span className="rounded-full bg-accent px-1.5 text-[10px] text-white">
+                {extraSelected}
+              </span>
+            ) : null}
+          </button>
+
+          {showMore ? (
+            <div className="flex flex-col gap-2 border-l-2 border-surface-2 pl-3">
+              {SECONDARY_GROUPS.map(groupCheckbox)}
+            </div>
+          ) : null}
           <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
             Alle branches gaan in één zoekverzoek, maar Google geeft er hooguit
             twintig terug. Meer aanvinken betekent dus niet meer resultaten, wel

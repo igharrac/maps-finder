@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 import {
+  foundedInfo,
   MARKER_APPEARANCE,
   SORT_OPTIONS,
   STATUS_LABELS,
@@ -186,8 +187,32 @@ export function ResultsList({
                 {/* Signalen zijn belangrijker dan het cijfer: dit is wat je in een
                     gesprek gebruikt. */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {(() => {
+                    const founded = foundedInfo(result.score.signals);
+                    if (!founded) return null;
+                    return (
+                      <span
+                        className={
+                          founded.established
+                            ? 'rounded border border-[#DCE6E1] bg-accent-tint px-1.5 py-0.5 text-[10px] font-medium text-accent'
+                            : founded.young
+                              ? 'rounded border border-line bg-ochre-tint px-1.5 py-0.5 text-[10px] font-medium text-ochre-ink'
+                              : 'rounded border border-line bg-surface px-1.5 py-0.5 text-[10px] text-ink-2'
+                        }
+                        title={
+                          founded.established
+                            ? 'Lang gevestigd — vaak vaste klanten en budget'
+                            : founded.young
+                              ? 'Jong bedrijf'
+                              : 'Zelf vermeld op de website'
+                        }
+                      >
+                        {founded.label}
+                      </span>
+                    );
+                  })()}
                   {result.score.signals
-                    .filter((s) => s.kind === 'fact')
+                    .filter((s) => s.kind === 'fact' && s.key !== 'founded_year')
                     .slice(0, 2)
                     .map((signal) => (
                       <span
