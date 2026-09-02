@@ -47,3 +47,58 @@ export async function PATCH(
 
   return NextResponse.json(data);
 }
+
+/**
+ * Verwijdert een prospect volledig.
+ *
+ * Bewust geweigerd zodra er contact is geweest. De hele reden dat we prospects
+ * bewaren is dat je niet per ongeluk hetzelfde bedrijf twee keer benadert; wie
+ * een bezorgde flyer weggooit, gooit precies die bescherming weg. Voor "dit
+ * bedrijf is niks" is afwijzen de juiste actie — dan blijft het bekend.
+ */
+export async function DELETE(
+  _request: Request,
+  context: { params: Promise<{ id: string }> },
+) {
+  const { id } = await context.params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 });
+  }
+
+  const { count } = await supabase
+    .from('outreach_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('prospect_id', id)
+    .eq('owner_id', user.id);
+
+  if ((count ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Dit bedrijf is al benaderd. Verwijderen zou die geschiedenis wissen, ' +
+          'waardoor je het later opnieuw kunt benaderen. Wijs het af in plaats daarvan.',
+        suggestion: 'rejected',
+      },
+      { status: 409 },
+    );
+  }
+
+  const { error } = await supabase
+    .from('prospects')
+    .delete()
+    .eq('id', id)
+    .eq('owner_id', user.id);
+
+  if (error) {
+    console.error('[prospects] verwijderen mislukt', error);
+    return NextResponse.json({ error: 'Verwijderen mislukt.' }, { status: 500 });
+  }
+
+  return NextResponse.json({ deleted: true });
+}

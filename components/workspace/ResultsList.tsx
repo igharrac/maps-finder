@@ -12,6 +12,8 @@ type Props = {
   onSelect: (placeId: string | null) => void;
   onHover: (placeId: string | null) => void;
   onSave: (result: SearchResult) => void;
+  onUnsave: (result: SearchResult) => void;
+  onReject: (result: SearchResult) => void;
   onAnalyze: (result: SearchResult) => void;
   onToggleFlyer: (prospectId: string) => void;
 };
@@ -36,6 +38,8 @@ export function ResultsList({
   onSelect,
   onHover,
   onSave,
+  onUnsave,
+  onReject,
   onAnalyze,
   onToggleFlyer,
 }: Props) {
@@ -146,23 +150,41 @@ export function ResultsList({
                 </div>
               </button>
 
-              <div className="mt-2.5 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSave(result)}
-                  disabled={savingPlaceId === result.place.placeId || result.prospectId !== null}
-                  className={
-                    result.prospectId
-                      ? 'rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-3'
-                      : 'rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-60'
-                  }
-                >
-                  {result.prospectId
-                    ? 'Opgeslagen'
-                    : savingPlaceId === result.place.placeId
-                      ? 'Bezig…'
-                      : 'Opslaan'}
-                </button>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {result.prospectId ? (
+                  <button
+                    type="button"
+                    onClick={() => onUnsave(result)}
+                    disabled={savingPlaceId === result.place.placeId}
+                    title="Klik om dit bedrijf weer uit je prospects te halen"
+                    className="flex items-center gap-1.5 rounded-md border border-accent bg-accent-tint px-2.5 py-1 text-[11px] font-medium text-accent disabled:opacity-60"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m5 13 4 4L19 7" />
+                    </svg>
+                    {savingPlaceId === result.place.placeId ? 'Bezig…' : 'Opgeslagen'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onSave(result)}
+                    disabled={savingPlaceId === result.place.placeId}
+                    className="rounded-md bg-accent px-2.5 py-1 text-[11px] font-medium text-white disabled:opacity-60"
+                  >
+                    {savingPlaceId === result.place.placeId ? 'Bezig…' : 'Opslaan'}
+                  </button>
+                )}
+
+                {result.prospectId && result.status !== 'rejected' ? (
+                  <button
+                    type="button"
+                    onClick={() => onReject(result)}
+                    title="Bewaren als niet interessant, zodat je het niet nog eens beoordeelt"
+                    className="rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2 hover:border-line-strong"
+                  >
+                    Afwijzen
+                  </button>
+                ) : null}
                 {result.prospectId ? (
                   <label
                     className={

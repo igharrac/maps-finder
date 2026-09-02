@@ -199,6 +199,71 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
     }
   }, []);
 
+  const handleUnsave = useCallback(async (result: SearchResult) => {
+    if (!result.prospectId) return;
+    setSavingPlaceId(result.place.placeId);
+    setError(null);
+    setWarnings([]);
+
+    try {
+      const response = await fetch(`/api/prospects/${result.prospectId}`, { method: 'DELETE' });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error ?? 'Verwijderen mislukt.');
+        return;
+      }
+
+      setFlyerSelection((current) => current.filter((id) => id !== result.prospectId));
+      setResults((current) =>
+        current.map((r) =>
+          r.place.placeId === result.place.placeId
+            ? {
+                ...r,
+                prospectId: null,
+                status: 'discovered',
+                markerStyle: r.score.opportunityScore >= 80 ? 'high_potential' : r.score.opportunityScore >= 65 ? 'interesting' : 'new',
+              }
+            : r,
+        ),
+      );
+    } catch {
+      setError('Verwijderen mislukt.');
+    } finally {
+      setSavingPlaceId(null);
+    }
+  }, []);
+
+  const handleReject = useCallback(async (result: SearchResult) => {
+    if (!result.prospectId) return;
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/prospects/${result.prospectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error ?? 'Afwijzen mislukt.');
+        return;
+      }
+
+      setFlyerSelection((current) => current.filter((id) => id !== result.prospectId));
+      setResults((current) =>
+        current.map((r) =>
+          r.place.placeId === result.place.placeId
+            ? { ...r, status: 'rejected', markerStyle: 'new' }
+            : r,
+        ),
+      );
+    } catch {
+      setError('Afwijzen mislukt.');
+    }
+  }, []);
+
   const toggleFlyer = useCallback((prospectId: string) => {
     setFlyerSelection((current) =>
       current.includes(prospectId)
@@ -339,6 +404,8 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           onSelect={setSelectedPlaceId}
           onHover={setHoveredPlaceId}
           onSave={handleSave}
+          onUnsave={handleUnsave}
+          onReject={handleReject}
           onAnalyze={handleAnalyze}
           onToggleFlyer={toggleFlyer}
         />
