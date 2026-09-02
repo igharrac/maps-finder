@@ -114,8 +114,24 @@ export function flyerReadiness(
   signals: Signal[],
   place: PlaceSummary,
 ): { ready: boolean; observations: Observation[]; reason?: string } {
-  if (signals.length === 0) {
-    return { ready: false, observations: [], reason: 'Nog niet geanalyseerd.' };
+  // Zonder website-analyse hebben we alleen Google-velden, en daar staat niets
+  // in dat op een flyer thuishoort.
+  const analyzed = signals.some((s) => s.detectedBy === 'website_probe');
+  if (!analyzed) {
+    return {
+      ready: false,
+      observations: [],
+      reason: 'Nog niet geanalyseerd — klik eerst op "Analyseer site".',
+    };
+  }
+
+  const unreachable = signals.find((s) => s.key === 'site_reachable' && s.normalized === 0);
+  if (unreachable) {
+    return {
+      ready: false,
+      observations: [],
+      reason: 'De website was niet bereikbaar toen we keken; daar drukken we niets over.',
+    };
   }
 
   const observations = observationsForFlyer(signals, place);
@@ -126,8 +142,8 @@ export function flyerReadiness(
       observations,
       reason:
         observations.length === 0
-          ? 'Niets concreets gevonden om te benoemen.'
-          : 'Te weinig gevonden voor een gepersonaliseerde flyer — gebruik de generieke.',
+          ? 'Site is op orde — niets concreets om te benoemen. Gebruik de generieke flyer.'
+          : `Maar één bevinding ("${observations[0].title}"); te mager voor een eigen flyer.`,
     };
   }
 

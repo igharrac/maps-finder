@@ -241,7 +241,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           if (Array.isArray(summary.skipped) && summary.skipped.length) {
             setWarnings(
               summary.skipped.map(
-                (s: { name: string; reason: string }) => `Overgeslagen &mdash; ${s.name}: ${s.reason}`,
+                (s: { name: string; reason: string }) => `Overgeslagen — ${s.name}: ${s.reason}`,
               ),
             );
           }

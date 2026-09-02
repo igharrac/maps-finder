@@ -165,11 +165,20 @@ export function ResultsList({
                 </button>
                 {result.prospectId ? (
                   <label
-                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2"
-                    title="Meenemen in de gepersonaliseerde flyers"
+                    className={
+                      result.status === 'discovered' || result.status === 'saved'
+                        ? 'flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-3 opacity-50'
+                        : 'flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2'
+                    }
+                    title={
+                      result.status === 'discovered' || result.status === 'saved'
+                        ? 'Analyseer eerst de site — zonder bevindingen valt er niets te personaliseren'
+                        : 'Meenemen in de gepersonaliseerde flyers'
+                    }
                   >
                     <input
                       type="checkbox"
+                      disabled={result.status === 'discovered' || result.status === 'saved'}
                       checked={flyerSelection.includes(result.prospectId)}
                       onChange={() => onToggleFlyer(result.prospectId!)}
                       className="h-3 w-3 accent-[var(--color-accent)]"

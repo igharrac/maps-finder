@@ -177,7 +177,8 @@ export async function POST(request: Request) {
   if (flyers.length === 0) {
     return NextResponse.json(
       {
-        error: 'Geen enkel bedrijf had genoeg concrete waarnemingen voor een eigen flyer.',
+        error:
+          'Geen enkel geselecteerd bedrijf kwam in aanmerking. Per bedrijf staat hieronder waarom.',
         skipped,
       },
       { status: 422 },
