@@ -82,13 +82,22 @@ export function ProspectMap({
         title: result.place.name,
       });
 
+      const TOOLTIP_W = 240;
+      const TOOLTIP_H = 150;
+
       const place = (event: MouseEvent) => {
         const bounds = containerRef.current?.getBoundingClientRect();
         if (!bounds) return;
+
+        // Positie meteen binnen de kaart houden. Dit hier doen en niet tijdens
+        // het renderen, want een ref uitlezen tijdens render is niet veilig.
+        const x = event.clientX - bounds.left;
+        const y = event.clientY - bounds.top;
+
         setTooltip({
           result,
-          x: event.clientX - bounds.left,
-          y: event.clientY - bounds.top,
+          x: Math.min(Math.max(x + 16, 8), Math.max(8, bounds.width - TOOLTIP_W - 8)),
+          y: Math.min(Math.max(y - 12, 8), Math.max(8, bounds.height - TOOLTIP_H - 8)),
         });
       };
 
@@ -267,10 +276,7 @@ export function ProspectMap({
         <div
           role="tooltip"
           className="pointer-events-none absolute z-20 w-60 rounded-xl border border-line bg-surface p-3 shadow-lg"
-          style={{
-            left: Math.min(Math.max(tooltip.x + 16, 8), Math.max(8, (containerRef.current?.clientWidth ?? 0) - 248)),
-            top: Math.min(Math.max(tooltip.y - 12, 8), Math.max(8, (containerRef.current?.clientHeight ?? 0) - 160)),
-          }}
+          style={{ left: tooltip.x, top: tooltip.y }}
         >
           <div className="flex items-start gap-2.5">
             <div className="min-w-0 flex-1">
