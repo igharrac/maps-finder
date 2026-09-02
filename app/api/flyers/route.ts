@@ -53,7 +53,11 @@ export async function POST(request: Request) {
   }
 
   const { prospectIds, campaignId, interleave } = parsed.data;
+  // Staat de applicatie nog niet online, dan is er geen /scan/-adres dat werkt.
+  // De QR wijst dan naar de website zelf: een code die iets doet is beter dan
+  // een code die op een 404 uitkomt. Meten komt met de tweede oplage.
   const scanBase = (process.env.FLYER_SCAN_BASE_URL ?? '').replace(/\/$/, '');
+  const tracking = scanBase !== '';
 
   const { data: rows, error } = await supabase
     .from('prospects')
@@ -123,31 +127,37 @@ export async function POST(request: Request) {
       continue;
     }
 
-    // Bestaande code hergebruiken, zodat een herdruk dezelfde QR houdt.
-    const { data: existing } = await supabase
-      .from('tracking_codes')
-      .select('code')
-      .eq('prospect_id', row.id)
-      .is('revoked_at', null)
-      .limit(1)
-      .maybeSingle();
+    let scanUrl = sender.website.startsWith('http')
+      ? sender.website
+      : `https://${sender.website}`;
 
-    let code = existing?.code;
-    if (!code) {
-      code = generateTrackingCode();
-      const { error: codeError } = await supabase.from('tracking_codes').insert({
-        owner_id: user.id,
-        code,
-        prospect_id: row.id,
-        campaign_id: campaignId ?? null,
-      });
-      if (codeError) {
-        skipped.push({ prospectId: row.id, name, reason: 'Trackingcode aanmaken mislukt.' });
-        continue;
+    if (tracking) {
+      // Bestaande code hergebruiken, zodat een herdruk dezelfde QR houdt.
+      const { data: existing } = await supabase
+        .from('tracking_codes')
+        .select('code')
+        .eq('prospect_id', row.id)
+        .is('revoked_at', null)
+        .limit(1)
+        .maybeSingle();
+
+      let code = existing?.code;
+      if (!code) {
+        code = generateTrackingCode();
+        const { error: codeError } = await supabase.from('tracking_codes').insert({
+          owner_id: user.id,
+          code,
+          prospect_id: row.id,
+          campaign_id: campaignId ?? null,
+        });
+        if (codeError) {
+          skipped.push({ prospectId: row.id, name, reason: 'Trackingcode aanmaken mislukt.' });
+          continue;
+        }
       }
-    }
 
-    const scanUrl = `${scanBase}/scan/${code}`;
+      scanUrl = `${scanBase}/scan/${code}`;
+    }
     const qrSvg = await QRCode.toString(scanUrl, {
       type: 'svg',
       errorCorrectionLevel: 'M',

@@ -149,7 +149,12 @@ PDF te maken als er tekst zou wegvallen.
 
 ### QR-codes
 
-Elke flyer krijgt een eigen code die naar `/scan/{code}` wijst. Die route legt de
+**Zolang `FLYER_SCAN_BASE_URL` leeg is** wijst de QR naar `FLYER_WEBSITE` en
+wordt er geen trackingcode aangemaakt. Zo kun je nu al drukken zonder dat de
+code op een 404 uitkomt; je meet alleen nog niets.
+
+Zodra de applicatie online staat vul je `FLYER_SCAN_BASE_URL` in. Vanaf dan
+krijgt elke flyer een eigen code die naar `/scan/{code}` wijst. Die route legt de
 scan vast en stuurt door naar `NEXT_PUBLIC_SCAN_REDIRECT_URL`. Codes zijn
 willekeurig, niet oplopend, en een herdruk hergebruikt dezelfde code.
 
@@ -157,8 +162,8 @@ Het vastleggen loopt via de databasefunctie `record_scan` (migratie 0002), niet
 via de service-key: de bezoeker is niet ingelogd, en die functie kan precies één
 ding en geeft niets terug.
 
-**Zet de applicatie online voordat je flyers laat drukken.** Draait hij alleen
-lokaal, dan wijst elke QR naar een dode link.
+Zet `FLYER_SCAN_BASE_URL` pas als de applicatie echt bereikbaar is op dat
+adres. Een gedrukte QR die naar een 404 wijst kun je niet meer terughalen.
 
 ## Nog te bouwen
 
