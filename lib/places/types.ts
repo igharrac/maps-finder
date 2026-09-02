@@ -29,4 +29,6 @@ export type PlacesSearchResult = {
   places: PlaceSummary[];
   /** Aantal Places-verzoeken dat deze zoekactie gekost heeft. */
   requestCount: number;
+  /** Niet-fatale problemen, zoals een branchetype dat Google weigerde. */
+  warnings: string[];
 };

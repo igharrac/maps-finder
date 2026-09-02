@@ -60,7 +60,7 @@ export async function POST(request: Request) {
   const { lat, lng, radiusMeters, includedTypes } = parsed.data;
 
   try {
-    const { places, requestCount } = await searchNearby({
+    const { places, requestCount, warnings } = await searchNearby({
       lat,
       lng,
       radiusMeters,
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
     results.sort((a, b) => b.score.opportunityScore - a.score.opportunityScore);
 
-    return NextResponse.json({ results, requestCount });
+    return NextResponse.json({ results, requestCount, warnings });
   } catch (error) {
     if (error instanceof PlacesError) {
       return NextResponse.json({ error: error.message }, { status: 502 });

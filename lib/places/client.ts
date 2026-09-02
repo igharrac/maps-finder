@@ -84,37 +84,25 @@ function toSummary(raw: RawPlace): PlaceSummary | null {
  * middelpunten. Dat gebeurt bewust NIET automatisch — de gebruiker start elke
  * zoekactie zelf, zodat pannen en zoomen geen kosten veroorzaakt.
  */
-export async function searchNearby(params: {
-  lat: number;
-  lng: number;
-  radiusMeters: number;
-  includedTypes?: string[];
-}): Promise<PlacesSearchResult> {
-  const { placesKey } = serverEnv();
+/** Haalt de afgewezen types uit een INVALID_ARGUMENT-melding van Google. */
+function parseUnsupportedTypes(detail: string): string[] {
+  const match = /Unsupported types:\s*([^"\\}]+)/i.exec(detail);
+  if (!match) return [];
+  return match[1]
+    .split(',')
+    .map((t) => t.trim().replace(/[.\s]+$/, ''))
+    .filter(Boolean);
+}
 
-  const body: Record<string, unknown> = {
-    maxResultCount: MAX_RESULTS_PER_REQUEST,
-    rankPreference: 'POPULARITY',
-    languageCode: 'nl',
-    regionCode: 'NL',
-    locationRestriction: {
-      circle: {
-        center: { latitude: params.lat, longitude: params.lng },
-        // Google accepteert maximaal 50 km.
-        radius: Math.min(Math.max(params.radiusMeters, 1), 50_000),
-      },
-    },
-  };
-
-  if (params.includedTypes?.length) {
-    body.includedTypes = params.includedTypes;
-  }
-
+async function callSearchNearby(
+  key: string,
+  body: Record<string, unknown>,
+): Promise<{ ok: true; places: RawPlace[] } | { ok: false; status: number; detail: string }> {
   const response = await fetch(PLACES_ENDPOINT, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'X-Goog-Api-Key': placesKey,
+      'X-Goog-Api-Key': key,
       'X-Goog-FieldMask': DISCOVERY_FIELD_MASK,
     },
     body: JSON.stringify(body),
@@ -122,19 +110,82 @@ export async function searchNearby(params: {
   });
 
   if (!response.ok) {
-    const detail = await response.text();
-    throw new PlacesError(
-      `Places API gaf ${response.status}: ${detail.slice(0, 400)}`,
-      response.status,
-    );
+    return { ok: false, status: response.status, detail: await response.text() };
   }
 
   const data = (await response.json()) as { places?: RawPlace[] };
-  const places = (data.places ?? [])
+  return { ok: true, places: data.places ?? [] };
+}
+
+/**
+ * Zoekt bedrijven binnen een straal. Eén verzoek levert maximaal 20 resultaten;
+ * een gebied afdekken vraagt dus om meerdere aanroepen met verschillende
+ * middelpunten. Dat gebeurt bewust NIET automatisch — de gebruiker start elke
+ * zoekactie zelf, zodat pannen en zoomen geen kosten veroorzaakt.
+ *
+ * Weigert Google een branchetype, dan laten we de zoekactie niet klappen: het
+ * type gaat eruit en het verzoek wordt één keer opnieuw gedaan, met een melding
+ * erbij. Een verkeerd type in de configuratie mag nooit een lege kaart opleveren.
+ */
+export async function searchNearby(params: {
+  lat: number;
+  lng: number;
+  radiusMeters: number;
+  includedTypes?: string[];
+}): Promise<PlacesSearchResult> {
+  const { placesKey } = serverEnv();
+  const warnings: string[] = [];
+  let requestCount = 0;
+
+  const buildBody = (types?: string[]): Record<string, unknown> => {
+    const body: Record<string, unknown> = {
+      maxResultCount: MAX_RESULTS_PER_REQUEST,
+      rankPreference: 'POPULARITY',
+      languageCode: 'nl',
+      regionCode: 'NL',
+      locationRestriction: {
+        circle: {
+          center: { latitude: params.lat, longitude: params.lng },
+          // Google accepteert maximaal 50 km.
+          radius: Math.min(Math.max(params.radiusMeters, 1), 50_000),
+        },
+      },
+    };
+    if (types?.length) body.includedTypes = types;
+    return body;
+  };
+
+  let types = params.includedTypes?.length ? [...params.includedTypes] : undefined;
+
+  requestCount += 1;
+  let result = await callSearchNearby(placesKey, buildBody(types));
+
+  if (!result.ok && result.status === 400 && types) {
+    const unsupported = parseUnsupportedTypes(result.detail);
+    const remaining = types.filter((t) => !unsupported.includes(t));
+
+    if (unsupported.length && remaining.length < types.length) {
+      warnings.push(
+        `Google accepteert ${unsupported.join(', ')} niet als zoektype; deze zijn overgeslagen.`,
+      );
+      types = remaining.length ? remaining : undefined;
+      requestCount += 1;
+      result = await callSearchNearby(placesKey, buildBody(types));
+    }
+  }
+
+  if (!result.ok) {
+    throw new PlacesError(
+      `Places API gaf ${result.status}: ${result.detail.slice(0, 400)}`,
+      result.status,
+    );
+  }
+
+  const places = result.places
     .map(toSummary)
     .filter((p): p is PlaceSummary => p !== null);
 
-  return { places, requestCount: 1 };
+  return { places, requestCount, warnings };
 }
 
 /**

@@ -33,6 +33,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   const [searching, setSearching] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [requestCount, setRequestCount] = useState(0);
 
   const includedTypes = useMemo(
@@ -45,6 +46,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
     async (at: { lat: number; lng: number }, radius: number, types: string[]) => {
       setSearching(true);
       setError(null);
+      setWarnings([]);
 
       try {
         const response = await fetch('/api/places/search', {
@@ -65,6 +67,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
         }
 
         setResults(data.results as SearchResult[]);
+        setWarnings((data.warnings as string[]) ?? []);
         setRequestCount((n) => n + (data.requestCount ?? 1));
       } catch {
         setError('Kon de zoekopdracht niet uitvoeren. Controleer je verbinding.');
@@ -192,6 +195,12 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           {error}
         </p>
       ) : null}
+
+      {warnings.map((warning) => (
+        <p key={warning} role="status" className="bg-surface-2 px-4 py-2 text-xs text-ink-2">
+          {warning}
+        </p>
+      ))}
 
       <div className="flex min-h-0 flex-1">
         <FilterSidebar filters={filters} counts={{}} onChange={setFilters} />

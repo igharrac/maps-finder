@@ -4,6 +4,10 @@
  * De `types` zijn Google Places-types en gaan mee als includedTypes in het
  * zoekverzoek. Meer types betekent meer verzoeken en dus meer kosten, dus de
  * groepen zijn bewust klein gehouden.
+ *
+ * Alleen types uit Google's Tabel A mogen opgevraagd worden. Types uit Tabel B
+ * (zoals general_contractor) krijg je wél terug als primaryType, maar een
+ * verzoek ermee wordt geweigerd met INVALID_ARGUMENT.
  */
 export type CategoryGroup = {
   id: string;
@@ -20,7 +24,7 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
   {
     id: 'bouw',
     label: 'Bouw & aannemerij',
-    types: ['general_contractor', 'roofing_contractor', 'painter'],
+    types: ['roofing_contractor', 'painter'],
   },
   {
     id: 'auto',
