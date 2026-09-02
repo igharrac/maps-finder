@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
+
 import {
   MARKER_APPEARANCE,
   SORT_OPTIONS,
@@ -12,6 +14,7 @@ type Props = {
   results: SearchResult[];
   totalBeforeFilter: number;
   selectedPlaceId: string | null;
+  hoveredPlaceId: string | null;
   savingPlaceId: string | null;
   analyzingPlaceId: string | null;
   flyerSelection: string[];
@@ -40,6 +43,7 @@ export function ResultsList({
   results,
   totalBeforeFilter,
   selectedPlaceId,
+  hoveredPlaceId,
   savingPlaceId,
   analyzingPlaceId,
   flyerSelection,
@@ -53,6 +57,18 @@ export function ResultsList({
   onAnalyze,
   onToggleFlyer,
 }: Props) {
+  const rowsRef = useRef(new Map<string, HTMLLIElement>());
+
+  // Een marker aanklikken die buiten beeld staat gaf een selectie die je niet
+  // zag. De lijst schuift nu mee.
+  useEffect(() => {
+    if (!selectedPlaceId) return;
+    rowsRef.current.get(selectedPlaceId)?.scrollIntoView({
+      block: 'nearest',
+      behavior: 'smooth',
+    });
+  }, [selectedPlaceId]);
+
   return (
     <section
       aria-label="Zoekresultaten"
@@ -103,12 +119,18 @@ export function ResultsList({
           return (
             <li
               key={result.place.placeId}
+              ref={(el) => {
+                if (el) rowsRef.current.set(result.place.placeId, el);
+                else rowsRef.current.delete(result.place.placeId);
+              }}
               onMouseEnter={() => onHover(result.place.placeId)}
               onMouseLeave={() => onHover(null)}
               className={
                 selected
                   ? 'border-b border-b-surface-2 border-l-[3px] border-l-accent bg-accent-tint px-4 py-3'
-                  : 'border-b border-surface-2 px-4 py-3 hover:bg-canvas'
+                  : result.place.placeId === hoveredPlaceId
+                    ? 'border-b border-surface-2 bg-canvas px-4 py-3'
+                    : 'border-b border-surface-2 px-4 py-3 hover:bg-canvas'
               }
             >
               <button

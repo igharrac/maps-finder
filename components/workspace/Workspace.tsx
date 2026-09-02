@@ -408,6 +408,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
             hoveredPlaceId={hoveredPlaceId}
             searching={searching}
             onSelect={setSelectedPlaceId}
+            onHover={setHoveredPlaceId}
             onSearchThisArea={handleSearchThisArea}
           />
           {requestCount > 0 ? (
@@ -421,6 +422,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           results={visible}
           totalBeforeFilter={results.length}
           selectedPlaceId={selectedPlaceId}
+          hoveredPlaceId={hoveredPlaceId}
           savingPlaceId={savingPlaceId}
           analyzingPlaceId={analyzingPlaceId}
           flyerSelection={flyerSelection}

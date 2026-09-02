@@ -1,9 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
-import { MARKER_APPEARANCE, type MarkerStyleKey, type SearchResult } from '@/lib/types';
+import {
+  MARKER_APPEARANCE,
+  STATUS_LABELS,
+  type MarkerStyleKey,
+  type SearchResult,
+} from '@/lib/types';
 import { createMarkerElement } from './markers';
 
 type Props = {
@@ -16,6 +21,7 @@ type Props = {
   hoveredPlaceId: string | null;
   searching: boolean;
   onSelect: (placeId: string | null) => void;
+  onHover: (placeId: string | null) => void;
   onSearchThisArea: (center: { lat: number; lng: number }, radiusMeters: number) => void;
 };
 
@@ -45,6 +51,7 @@ export function ProspectMap({
   hoveredPlaceId,
   searching,
   onSelect,
+  onHover,
   onSearchThisArea,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +65,47 @@ export function ProspectMap({
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [areaDirty, setAreaDirty] = useState(false);
+  const [tooltip, setTooltip] = useState<{ result: SearchResult; x: number; y: number } | null>(
+    null,
+  );
+
+  /**
+   * Bouwt de inhoud van een marker inclusief hover-afhandeling.
+   *
+   * De listeners horen bij het element zelf: zodra een marker geselecteerd
+   * raakt wordt zijn content vervangen, en losse listeners zouden dan verdwijnen.
+   */
+  const buildContent = useCallback(
+    (result: SearchResult, selected: boolean) => {
+      const el = createMarkerElement(result.markerStyle, {
+        selected,
+        title: result.place.name,
+      });
+
+      const place = (event: MouseEvent) => {
+        const bounds = containerRef.current?.getBoundingClientRect();
+        if (!bounds) return;
+        setTooltip({
+          result,
+          x: event.clientX - bounds.left,
+          y: event.clientY - bounds.top,
+        });
+      };
+
+      el.addEventListener('mouseenter', (event) => {
+        onHover(result.place.placeId);
+        place(event as MouseEvent);
+      });
+      el.addEventListener('mousemove', (event) => place(event as MouseEvent));
+      el.addEventListener('mouseleave', () => {
+        onHover(null);
+        setTooltip(null);
+      });
+
+      return el;
+    },
+    [onHover],
+  );
 
   // --- kaart initialiseren -------------------------------------------------
   useEffect(() => {
@@ -150,7 +198,7 @@ export function ProspectMap({
     const markers = results.map((result) => {
       const marker = new markerLib.AdvancedMarkerElement({
         position: { lat: result.place.lat, lng: result.place.lng },
-        content: createMarkerElement(result.markerStyle, { title: result.place.name }),
+        content: buildContent(result, false),
         title: result.place.name,
         gmpClickable: true,
       });
@@ -167,7 +215,7 @@ export function ProspectMap({
     return () => {
       clustererRef.current?.removeMarkers(markers);
     };
-  }, [ready, results, onSelect]);
+  }, [ready, results, onSelect, buildContent]);
 
   // --- selectie en hover benadrukken ---------------------------------------
   useEffect(() => {
@@ -178,13 +226,10 @@ export function ProspectMap({
       const marker = markersRef.current.get(result.place.placeId);
       if (!marker) continue;
       const isActive = result.place.placeId === active;
-      marker.content = createMarkerElement(result.markerStyle, {
-        selected: isActive,
-        title: result.place.name,
-      });
+      marker.content = buildContent(result, isActive);
       marker.zIndex = isActive ? 999 : undefined;
     }
-  }, [ready, results, selectedPlaceId, hoveredPlaceId]);
+  }, [ready, results, selectedPlaceId, hoveredPlaceId, buildContent]);
 
   function handleSearchThisArea() {
     const map = mapRef.current;
@@ -215,6 +260,61 @@ export function ProspectMap({
       {loadError ? (
         <div className="absolute inset-0 flex items-center justify-center p-8">
           <p className="max-w-sm text-center text-sm text-ink-2">{loadError}</p>
+        </div>
+      ) : null}
+
+      {tooltip ? (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute z-20 w-60 rounded-xl border border-line bg-surface p-3 shadow-lg"
+          style={{
+            left: Math.min(Math.max(tooltip.x + 16, 8), Math.max(8, (containerRef.current?.clientWidth ?? 0) - 248)),
+            top: Math.min(Math.max(tooltip.y - 12, 8), Math.max(8, (containerRef.current?.clientHeight ?? 0) - 160)),
+          }}
+        >
+          <div className="flex items-start gap-2.5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold leading-tight">{tooltip.result.place.name}</p>
+              <p className="mt-0.5 text-[11px] text-ink-3">
+                {tooltip.result.place.categoryLabel ?? 'Categorie onbekend'} ·{' '}
+                {tooltip.result.distanceMeters < 1000
+                  ? `${tooltip.result.distanceMeters} m`
+                  : `${(tooltip.result.distanceMeters / 1000).toFixed(1).replace('.', ',')} km`}
+              </p>
+            </div>
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-base tabular"
+              style={{
+                background: MARKER_APPEARANCE[tooltip.result.markerStyle].color,
+                color: '#fff',
+              }}
+            >
+              {tooltip.result.score.opportunityScore}
+            </span>
+          </div>
+
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-ink-2">
+            {tooltip.result.place.rating !== null ? (
+              <span className="tabular">
+                ★ {tooltip.result.place.rating.toFixed(1).replace('.', ',')}
+              </span>
+            ) : null}
+            <span>{tooltip.result.place.reviewCount ?? 0} reviews</span>
+            <span className="ml-auto font-medium">{STATUS_LABELS[tooltip.result.status]}</span>
+          </div>
+
+          {tooltip.result.score.signals.filter((s) => s.kind === 'fact').length ? (
+            <ul className="mt-2 flex flex-col gap-1 border-t border-surface-2 pt-2">
+              {tooltip.result.score.signals
+                .filter((s) => s.kind === 'fact')
+                .slice(0, 3)
+                .map((signal) => (
+                  <li key={signal.key} className="text-[11px] leading-snug text-ink-2">
+                    {signal.label}
+                  </li>
+                ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
