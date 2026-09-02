@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { CATEGORY_GROUPS } from '@/lib/categories';
-import type { SearchResult } from '@/lib/types';
+import { MARKER_ORDER, type SearchResult, type SortId } from '@/lib/types';
 import { DEFAULT_FILTERS, FilterSidebar, type Filters } from './FilterSidebar';
 import { ProspectMap } from './ProspectMap';
 import { ResultsList } from './ResultsList';
@@ -31,6 +31,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
   const [analyzingPlaceId, setAnalyzingPlaceId] = useState<string | null>(null);
   const [flyerSelection, setFlyerSelection] = useState<string[]>([]);
+  const [sort, setSort] = useState<SortId>('score');
   const [generatingFlyers, setGeneratingFlyers] = useState(false);
 
   const [searching, setSearching] = useState(false);
@@ -332,7 +333,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   }, [flyerSelection]);
 
   const visible = useMemo(() => {
-    return results.filter((r) => {
+    const filtered = results.filter((r) => {
       if (r.score.opportunityScore < filters.minScore) return false;
       if (filters.minRating > 0 && (r.place.rating ?? 0) < filters.minRating) return false;
       if (filters.minReviews > 0 && (r.place.reviewCount ?? 0) < filters.minReviews) return false;
@@ -340,7 +341,26 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       if (filters.hideDelivered && r.status === 'flyer_delivered') return false;
       return true;
     });
-  }, [results, filters]);
+
+    // Sorteren op status volgt de volgorde van de legenda, zodat lijst en kaart
+    // dezelfde logica gebruiken.
+    const byStatus = (r: SearchResult) => MARKER_ORDER.indexOf(r.markerStyle);
+
+    return [...filtered].sort((a, b) => {
+      switch (sort) {
+        case 'status':
+          return byStatus(a) - byStatus(b) || b.score.opportunityScore - a.score.opportunityScore;
+        case 'distance':
+          return a.distanceMeters - b.distanceMeters;
+        case 'reviews':
+          return (b.place.reviewCount ?? 0) - (a.place.reviewCount ?? 0);
+        case 'rating':
+          return (b.place.rating ?? 0) - (a.place.rating ?? 0);
+        default:
+          return b.score.opportunityScore - a.score.opportunityScore;
+      }
+    });
+  }, [results, filters, sort]);
 
   return (
     <div className="flex h-screen flex-col">
@@ -401,6 +421,8 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           savingPlaceId={savingPlaceId}
           analyzingPlaceId={analyzingPlaceId}
           flyerSelection={flyerSelection}
+          sort={sort}
+          onSortChange={setSort}
           onSelect={setSelectedPlaceId}
           onHover={setHoveredPlaceId}
           onSave={handleSave}

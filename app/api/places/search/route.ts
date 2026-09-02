@@ -9,7 +9,8 @@ const bodySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   radiusMeters: z.number().min(100).max(50_000),
-  includedTypes: z.array(z.string().min(1).max(60)).max(12).optional(),
+  // Google accepteert er maximaal 50 in één verzoek.
+  includedTypes: z.array(z.string().min(1).max(60)).max(50).optional(),
 });
 
 /** Meters tussen twee coördinaten (haversine). */

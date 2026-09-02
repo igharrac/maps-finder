@@ -67,7 +67,9 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
             </label>
           ))}
           <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
-            Elke aangevinkte branche is een apart zoekverzoek bij Google.
+            Alle branches gaan in één zoekverzoek, maar Google geeft er hooguit
+            twintig terug. Meer aanvinken betekent dus niet meer resultaten, wel
+            een bredere mix.
           </p>
         </fieldset>
 

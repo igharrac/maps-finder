@@ -102,6 +102,29 @@ export type MarkerAppearance = {
   label: string;
 };
 
+/**
+ * Volgorde van de legenda, en daarmee de sorteervolgorde op status: van
+ * onbekeken naar wie al gereageerd heeft.
+ */
+export const MARKER_ORDER: MarkerStyleKey[] = [
+  'new',
+  'interesting',
+  'high_potential',
+  'flyer_planned',
+  'flyer_delivered',
+  'responded',
+];
+
+export const SORT_OPTIONS = [
+  { id: 'score', label: 'Opportunity Score' },
+  { id: 'status', label: 'Status (legenda)' },
+  { id: 'distance', label: 'Afstand' },
+  { id: 'reviews', label: 'Aantal reviews' },
+  { id: 'rating', label: 'Rating' },
+] as const;
+
+export type SortId = (typeof SORT_OPTIONS)[number]['id'];
+
 export const MARKER_APPEARANCE: Record<MarkerStyleKey, MarkerAppearance> = {
   new: { color: '#9A9389', shape: 'circle', label: 'Nieuw' },
   interesting: { color: '#B7791F', shape: 'ring', label: 'Interessant' },

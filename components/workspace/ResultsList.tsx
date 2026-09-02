@@ -1,6 +1,12 @@
 'use client';
 
-import { MARKER_APPEARANCE, STATUS_LABELS, type SearchResult } from '@/lib/types';
+import {
+  MARKER_APPEARANCE,
+  SORT_OPTIONS,
+  STATUS_LABELS,
+  type SearchResult,
+  type SortId,
+} from '@/lib/types';
 
 type Props = {
   results: SearchResult[];
@@ -9,6 +15,8 @@ type Props = {
   savingPlaceId: string | null;
   analyzingPlaceId: string | null;
   flyerSelection: string[];
+  sort: SortId;
+  onSortChange: (sort: SortId) => void;
   onSelect: (placeId: string | null) => void;
   onHover: (placeId: string | null) => void;
   onSave: (result: SearchResult) => void;
@@ -35,6 +43,8 @@ export function ResultsList({
   savingPlaceId,
   analyzingPlaceId,
   flyerSelection,
+  sort,
+  onSortChange,
   onSelect,
   onHover,
   onSave,
@@ -59,6 +69,24 @@ export function ResultsList({
             </span>
           ) : null}
         </div>
+
+        <label className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink-3)" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          <span className="sr-only">Sorteren op</span>
+          <select
+            value={sort}
+            onChange={(e) => onSortChange(e.target.value as SortId)}
+            className="flex-1 rounded-md border border-line bg-surface px-1.5 py-1 text-[11px]"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.id} value={option.id}>
+                Sorteer op {option.label.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       <ul className="flex-1 overflow-y-auto">
