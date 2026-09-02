@@ -337,7 +337,10 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       if (r.score.opportunityScore < filters.minScore) return false;
       if (filters.minRating > 0 && (r.place.rating ?? 0) < filters.minRating) return false;
       if (filters.minReviews > 0 && (r.place.reviewCount ?? 0) < filters.minReviews) return false;
-      if (filters.statuses.length && !filters.statuses.includes(r.status)) return false;
+      // OF binnen de categorieën: één treffer is genoeg.
+      if (filters.markerStyles.length && !filters.markerStyles.includes(r.markerStyle))
+        return false;
+      if (!filters.showRejected && r.status === 'rejected') return false;
       if (filters.hideDelivered && r.status === 'flyer_delivered') return false;
       return true;
     });

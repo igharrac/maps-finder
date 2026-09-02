@@ -1,15 +1,25 @@
 'use client';
 
 import { CATEGORY_GROUPS } from '@/lib/categories';
-import { PROSPECT_STATUSES, STATUS_LABELS, type ProspectStatus } from '@/lib/types';
+import { MARKER_APPEARANCE, MARKER_ORDER, type MarkerStyleKey } from '@/lib/types';
 
 export type Filters = {
   categoryIds: string[];
   minScore: number;
   minRating: number;
   minReviews: number;
-  statuses: ProspectStatus[];
+  /**
+   * Categorieën uit de legenda, niet de ruwe prospectstatus. Die twee liepen
+   * uiteen: een bedrijf met score 85 krijgt op de kaart de ruit van "hoog
+   * potentieel", terwijl zijn status in de database gewoon "ontdekt" is. Wie
+   * dan op Hoog potentieel filterde kreeg niets. Nu filtert de lijst op
+   * precies wat je op de kaart ziet.
+   *
+   * Meerdere aangevinkt betekent OF, niet EN.
+   */
+  markerStyles: MarkerStyleKey[];
   hideDelivered: boolean;
+  showRejected: boolean;
 };
 
 export const DEFAULT_FILTERS: Filters = {
@@ -17,8 +27,9 @@ export const DEFAULT_FILTERS: Filters = {
   minScore: 0,
   minRating: 0,
   minReviews: 0,
-  statuses: [],
+  markerStyles: [],
   hideDelivered: false,
+  showRejected: false,
 };
 
 type Props = {
@@ -133,38 +144,65 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
             Status
           </legend>
           <div className="flex flex-wrap gap-1.5">
-            {PROSPECT_STATUSES.map((status) => {
-              const active = filters.statuses.includes(status);
+            {MARKER_ORDER.map((key) => {
+              const active = filters.markerStyles.includes(key);
+              const { color, shape, label } = MARKER_APPEARANCE[key];
               return (
                 <button
-                  key={status}
+                  key={key}
                   type="button"
                   aria-pressed={active}
-                  onClick={() => onChange({ ...filters, statuses: toggle(filters.statuses, status) })}
+                  onClick={() =>
+                    onChange({ ...filters, markerStyles: toggle(filters.markerStyles, key) })
+                  }
                   className={
                     active
-                      ? 'rounded-full bg-ink px-2.5 py-1 text-[11px] font-medium text-white'
-                      : 'rounded-full border border-line px-2.5 py-1 text-[11px] text-ink-2'
+                      ? 'flex items-center gap-1.5 rounded-full bg-ink px-2.5 py-1 text-[11px] font-medium text-white'
+                      : 'flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[11px] text-ink-2'
                   }
                 >
-                  {STATUS_LABELS[status]}
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-2 w-2 shrink-0"
+                    style={{
+                      background: color,
+                      borderRadius: shape === 'square' ? '2px' : '50%',
+                      transform: shape === 'diamond' ? 'rotate(45deg)' : undefined,
+                    }}
+                  />
+                  {label}
                 </button>
               );
             })}
           </div>
+          <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
+            Meerdere aanvinken toont alles wat in één van die categorieën valt.
+            Niets aanvinken toont alles.
+          </p>
         </fieldset>
 
         <div className="h-px bg-surface-2" />
 
-        <label className="flex cursor-pointer items-center gap-2.5 text-xs">
-          <input
-            type="checkbox"
-            checked={filters.hideDelivered}
-            onChange={(e) => onChange({ ...filters, hideDelivered: e.target.checked })}
-            className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-          />
-          Verberg reeds bezorgd
-        </label>
+        <div className="flex flex-col gap-2.5">
+          <label className="flex cursor-pointer items-center gap-2.5 text-xs">
+            <input
+              type="checkbox"
+              checked={filters.hideDelivered}
+              onChange={(e) => onChange({ ...filters, hideDelivered: e.target.checked })}
+              className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+            />
+            Verberg reeds bezorgd
+          </label>
+          <label className="flex cursor-pointer items-center gap-2.5 text-xs">
+            <input
+              type="checkbox"
+              checked={filters.showRejected}
+              onChange={(e) => onChange({ ...filters, showRejected: e.target.checked })}
+              className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+            />
+            Toon afgewezen bedrijven
+          </label>
+        </div>
       </div>
     </aside>
   );
