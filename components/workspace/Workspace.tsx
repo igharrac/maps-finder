@@ -30,6 +30,8 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
   const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
   const [analyzingPlaceId, setAnalyzingPlaceId] = useState<string | null>(null);
+  const [flyerSelection, setFlyerSelection] = useState<string[]>([]);
+  const [generatingFlyers, setGeneratingFlyers] = useState(false);
 
   const [searching, setSearching] = useState(false);
   const [resolving, setResolving] = useState(false);
@@ -197,6 +199,73 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
     }
   }, []);
 
+  const toggleFlyer = useCallback((prospectId: string) => {
+    setFlyerSelection((current) =>
+      current.includes(prospectId)
+        ? current.filter((id) => id !== prospectId)
+        : [...current, prospectId],
+    );
+  }, []);
+
+  const handleGenerateFlyers = useCallback(async () => {
+    if (flyerSelection.length === 0) return;
+    setGeneratingFlyers(true);
+    setError(null);
+    setWarnings([]);
+
+    try {
+      const response = await fetch('/api/flyers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prospectIds: flyerSelection }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error ?? 'Flyers maken mislukt.');
+        if (Array.isArray(data.skipped) && data.skipped.length) {
+          setWarnings(
+            data.skipped.map(
+              (s: { name: string; reason: string }) => `${s.name}: ${s.reason}`,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Wie is overgeslagen staat in de header, want het antwoord zelf is de PDF.
+      const summaryHeader = response.headers.get('X-Flyer-Summary');
+      if (summaryHeader) {
+        try {
+          const summary = JSON.parse(decodeURIComponent(summaryHeader));
+          if (Array.isArray(summary.skipped) && summary.skipped.length) {
+            setWarnings(
+              summary.skipped.map(
+                (s: { name: string; reason: string }) => `Overgeslagen &mdash; ${s.name}: ${s.reason}`,
+              ),
+            );
+          }
+        } catch {
+          // Samenvatting is bijzaak; de PDF is het resultaat.
+        }
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `flyers-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Flyers maken mislukt.');
+    } finally {
+      setGeneratingFlyers(false);
+    }
+  }, [flyerSelection]);
+
   const visible = useMemo(() => {
     return results.filter((r) => {
       if (r.score.opportunityScore < filters.minScore) return false;
@@ -266,12 +335,40 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           selectedPlaceId={selectedPlaceId}
           savingPlaceId={savingPlaceId}
           analyzingPlaceId={analyzingPlaceId}
+          flyerSelection={flyerSelection}
           onSelect={setSelectedPlaceId}
           onHover={setHoveredPlaceId}
           onSave={handleSave}
           onAnalyze={handleAnalyze}
+          onToggleFlyer={toggleFlyer}
         />
       </div>
+
+      {flyerSelection.length > 0 ? (
+        <div className="flex shrink-0 items-center gap-4 border-t border-line bg-ink px-4 py-3 text-white">
+          <span className="text-sm font-medium">
+            {flyerSelection.length} {flyerSelection.length === 1 ? 'bedrijf' : 'bedrijven'} geselecteerd
+          </span>
+          <span className="text-xs opacity-70">
+            Bedrijven zonder analyse of zonder concrete bevindingen worden overgeslagen.
+          </span>
+          <button
+            type="button"
+            onClick={() => setFlyerSelection([])}
+            className="ml-auto text-xs underline opacity-80"
+          >
+            Selectie wissen
+          </button>
+          <button
+            type="button"
+            onClick={handleGenerateFlyers}
+            disabled={generatingFlyers}
+            className="rounded-lg bg-white px-3.5 py-2 text-xs font-semibold text-ink disabled:opacity-60"
+          >
+            {generatingFlyers ? 'Bezig…' : 'Genereer flyers (PDF)'}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

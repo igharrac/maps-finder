@@ -106,7 +106,60 @@ mag die nooit door elkaar tonen.
 > "heeft wel of geen website". De `confidence` op de score laat dat zien. De
 > website-verrijking die dit echt onderscheidend maakt is de volgende stap.
 
+## Flyers
+
+Bij elke opgeslagen prospect staat een vinkje **Flyer**. Selecteer er een aantal
+en klik onderin op **Genereer flyers (PDF)**: je krijgt één PDF met per bedrijf
+een gepersonaliseerde voorkant en aan het eind één gedeelde achterkant.
+
+Eenmalig instellen:
+
+```bash
+npx playwright install chromium
+```
+
+Lukt die download niet, dan valt de generator terug op de Google Chrome die al
+op je machine staat.
+
+Vul daarnaast in `.env.local` je afzendergegevens in (`FLYER_BUSINESS_NAME`,
+`FLYER_WEBSITE`, `FLYER_EMAIL`, `FLYER_PHONE`) en `FLYER_SCAN_BASE_URL`. Zonder
+telefoonnummer weigert de generator.
+
+### Waarom bedrijven overgeslagen worden
+
+Een bedrijf krijgt alleen een eigen flyer als er minstens twee concrete
+waarnemingen zijn. De regels daarvoor staan in `lib/flyer/observations.ts`:
+
+- Alleen **feiten**, nooit gevolgtrekkingen of aanbevelingen.
+- Alleen signalen met voldoende zekerheid. Een copyrightjaartal is te zwak.
+- Elke zin beschrijft wat *wij* zagen, niet wat waar is over het bedrijf.
+  "Wij vonden geen aanvraagformulier" blijft kloppen ook als er één achter
+  JavaScript zit; "u heeft geen aanvraagformulier" niet.
+- Was de site onbereikbaar, dan geen flyer. Een storing van vijf minuten is
+  geen bevinding om te drukken.
+
+Dat is bewust streng. Een generieke flyer die niet aanslaat kost papier; een
+gedrukte bewering die niet klopt kost je het bedrijf.
+
+### Formaat
+
+A5 (148 × 210 mm) met 3 mm afloop, tekst als vector, fonts ingesloten. Klaar om
+te uploaden bij een online drukker. De generator meet elke pagina en weigert een
+PDF te maken als er tekst zou wegvallen.
+
+### QR-codes
+
+Elke flyer krijgt een eigen code die naar `/scan/{code}` wijst. Die route legt de
+scan vast en stuurt door naar `NEXT_PUBLIC_SCAN_REDIRECT_URL`. Codes zijn
+willekeurig, niet oplopend, en een herdruk hergebruikt dezelfde code.
+
+Het vastleggen loopt via de databasefunctie `record_scan` (migratie 0002), niet
+via de service-key: de bezoeker is niet ingelogd, en die functie kan precies één
+ding en geeft niets terug.
+
+**Zet de applicatie online voordat je flyers laat drukken.** Draait hij alleen
+lokaal, dan wijst elke QR naar een dode link.
+
 ## Nog te bouwen
 
-Campagnes, Flyer Mode, prospectdetailpaneel, website-verrijking en de
-AI-analyselaag. Zie het projectdocument voor de volgorde.
+Campagnes, Flyer Mode, het prospectdetailpaneel en de AI-analyselaag. Zie het projectdocument voor de volgorde.

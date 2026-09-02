@@ -8,10 +8,12 @@ type Props = {
   selectedPlaceId: string | null;
   savingPlaceId: string | null;
   analyzingPlaceId: string | null;
+  flyerSelection: string[];
   onSelect: (placeId: string | null) => void;
   onHover: (placeId: string | null) => void;
   onSave: (result: SearchResult) => void;
   onAnalyze: (result: SearchResult) => void;
+  onToggleFlyer: (prospectId: string) => void;
 };
 
 function scoreClasses(score: number): string {
@@ -30,10 +32,12 @@ export function ResultsList({
   selectedPlaceId,
   savingPlaceId,
   analyzingPlaceId,
+  flyerSelection,
   onSelect,
   onHover,
   onSave,
   onAnalyze,
+  onToggleFlyer,
 }: Props) {
   return (
     <section
@@ -159,6 +163,20 @@ export function ResultsList({
                       ? 'Bezig…'
                       : 'Opslaan'}
                 </button>
+                {result.prospectId ? (
+                  <label
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2"
+                    title="Meenemen in de gepersonaliseerde flyers"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={flyerSelection.includes(result.prospectId)}
+                      onChange={() => onToggleFlyer(result.prospectId!)}
+                      className="h-3 w-3 accent-[var(--color-accent)]"
+                    />
+                    Flyer
+                  </label>
+                ) : null}
                 {result.prospectId ? (
                   <button
                     type="button"
