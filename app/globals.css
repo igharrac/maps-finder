@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Ontwerptokens uit het Maps Finder-ontwerp. Statussen krijgen naast een kleur
+   altijd een eigen vorm; kleur alleen is niet toegankelijk (WCAG 2.2 AA). */
+@theme {
+  --color-canvas: #fbfaf8;
+  --color-surface: #ffffff;
+  --color-surface-2: #f5f2ed;
+  --color-line: #e5e0d8;
+  --color-line-strong: #d3ccc1;
+
+  --color-ink: #1a1815;
+  --color-ink-2: #5f594f;
+  --color-ink-3: #8b8479;
+
+  --color-accent: #14594a;
+  --color-accent-dark: #0e4438;
+  --color-accent-tint: #edf3f1;
+
+  --color-ochre: #b7791f;
+  --color-ochre-tint: #f0e8d8;
+  --color-ochre-ink: #8a6415;
+
+  --color-status-new: #9a9389;
+  --color-status-interesting: #b7791f;
+  --color-status-high: #14594a;
+  --color-status-planned: #2f5d8c;
+  --color-status-delivered: #6e7b85;
+  --color-status-responded: #c2410c;
+
+  --font-sans: var(--font-schibsted), "Helvetica Neue", Helvetica, sans-serif;
+  --font-display: var(--font-instrument), Georgia, serif;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Zichtbare focus is een vereiste, geen optie. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}

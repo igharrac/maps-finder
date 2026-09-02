@@ -1,0 +1,231 @@
+'use client';
+
+import { useCallback, useMemo, useState } from 'react';
+import { CATEGORY_GROUPS } from '@/lib/categories';
+import type { SearchResult } from '@/lib/types';
+import { DEFAULT_FILTERS, FilterSidebar, type Filters } from './FilterSidebar';
+import { ProspectMap } from './ProspectMap';
+import { ResultsList } from './ResultsList';
+import { TopBar } from './TopBar';
+
+type Props = {
+  userEmail: string;
+  mapsApiKey: string;
+  mapId: string;
+  missingEnv: string[];
+};
+
+/** Zaandam als startpunt; de gebruiker zoekt daarna zelf een gebied. */
+const INITIAL_CENTER = { lat: 52.4389, lng: 4.8296 };
+
+export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
+  const [center, setCenter] = useState(INITIAL_CENTER);
+  const [radiusMeters, setRadiusMeters] = useState(2000);
+  const [areaLabel, setAreaLabel] = useState('Zaandam');
+
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [results, setResults] = useState<SearchResult[]>([]);
+
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
+  const [savingPlaceId, setSavingPlaceId] = useState<string | null>(null);
+
+  const [searching, setSearching] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [requestCount, setRequestCount] = useState(0);
+
+  const includedTypes = useMemo(
+    () =>
+      CATEGORY_GROUPS.filter((g) => filters.categoryIds.includes(g.id)).flatMap((g) => g.types),
+    [filters.categoryIds],
+  );
+
+  const runSearch = useCallback(
+    async (at: { lat: number; lng: number }, radius: number, types: string[]) => {
+      setSearching(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/places/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat: at.lat,
+            lng: at.lng,
+            radiusMeters: radius,
+            includedTypes: types.length ? types : undefined,
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          setError(data.error ?? 'Zoeken mislukt.');
+          return;
+        }
+
+        setResults(data.results as SearchResult[]);
+        setRequestCount((n) => n + (data.requestCount ?? 1));
+      } catch {
+        setError('Kon de zoekopdracht niet uitvoeren. Controleer je verbinding.');
+      } finally {
+        setSearching(false);
+      }
+    },
+    [],
+  );
+
+  const handleResolveArea = useCallback(
+    async (query: string, radius: number) => {
+      setResolving(true);
+      setError(null);
+
+      try {
+        const response = await fetch(`/api/places/area?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          setError(data.error ?? 'Gebied niet gevonden.');
+          return;
+        }
+
+        const next = { lat: data.lat as number, lng: data.lng as number };
+        setCenter(next);
+        setRadiusMeters(radius);
+        setAreaLabel(data.label as string);
+        await runSearch(next, radius, includedTypes);
+      } catch {
+        setError('Locatie opzoeken mislukt.');
+      } finally {
+        setResolving(false);
+      }
+    },
+    [includedTypes, runSearch],
+  );
+
+  const handleSearchThisArea = useCallback(
+    (at: { lat: number; lng: number }, radius: number) => {
+      setCenter(at);
+      setRadiusMeters(radius);
+      void runSearch(at, radius, includedTypes);
+    },
+    [includedTypes, runSearch],
+  );
+
+  const handleSave = useCallback(async (result: SearchResult) => {
+    setSavingPlaceId(result.place.placeId);
+    try {
+      const response = await fetch('/api/prospects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          place: result.place,
+          status: 'saved',
+          score: {
+            modelVersion: result.score.modelVersion,
+            opportunityScore: result.score.opportunityScore,
+            businessPotential: result.score.businessPotential,
+            digitalMaturity: result.score.digitalMaturity,
+            weights: result.score.weights,
+            signals: result.score.signals.map((s) => ({
+              key: s.key,
+              kind: s.kind,
+              label: s.label,
+              value: s.value ?? null,
+              confidence: s.confidence,
+              detectedBy: s.detectedBy,
+            })),
+          },
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? 'Opslaan mislukt.');
+        return;
+      }
+
+      setResults((current) =>
+        current.map((r) =>
+          r.place.placeId === result.place.placeId
+            ? { ...r, prospectId: data.prospectId, status: 'saved', markerStyle: 'interesting' }
+            : r,
+        ),
+      );
+    } catch {
+      setError('Opslaan mislukt.');
+    } finally {
+      setSavingPlaceId(null);
+    }
+  }, []);
+
+  const visible = useMemo(() => {
+    return results.filter((r) => {
+      if (r.score.opportunityScore < filters.minScore) return false;
+      if (filters.minRating > 0 && (r.place.rating ?? 0) < filters.minRating) return false;
+      if (filters.minReviews > 0 && (r.place.reviewCount ?? 0) < filters.minReviews) return false;
+      if (filters.statuses.length && !filters.statuses.includes(r.status)) return false;
+      if (filters.hideDelivered && r.status === 'flyer_delivered') return false;
+      return true;
+    });
+  }, [results, filters]);
+
+  return (
+    <div className="flex h-screen flex-col">
+      <TopBar
+        areaLabel={areaLabel}
+        radiusMeters={radiusMeters}
+        userEmail={userEmail}
+        resolving={resolving}
+        onResolveArea={handleResolveArea}
+      />
+
+      {missingEnv.length ? (
+        <p role="alert" className="bg-ochre-tint px-4 py-2 text-xs text-ochre-ink">
+          Ontbrekende omgevingsvariabelen: {missingEnv.join(', ')}. Vul .env.local aan en herstart de
+          dev-server.
+        </p>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="bg-ochre-tint px-4 py-2 text-xs text-ochre-ink">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex min-h-0 flex-1">
+        <FilterSidebar filters={filters} counts={{}} onChange={setFilters} />
+
+        <main className="relative min-w-0 flex-1">
+          <ProspectMap
+            apiKey={mapsApiKey}
+            mapId={mapId}
+            center={center}
+            radiusMeters={radiusMeters}
+            results={visible}
+            selectedPlaceId={selectedPlaceId}
+            hoveredPlaceId={hoveredPlaceId}
+            searching={searching}
+            onSelect={setSelectedPlaceId}
+            onSearchThisArea={handleSearchThisArea}
+          />
+          {requestCount > 0 ? (
+            <p className="absolute right-4 top-4 rounded-md border border-line bg-surface/95 px-2 py-1 text-[10px] text-ink-3">
+              {requestCount} Places-verzoeken deze sessie
+            </p>
+          ) : null}
+        </main>
+
+        <ResultsList
+          results={visible}
+          totalBeforeFilter={results.length}
+          selectedPlaceId={selectedPlaceId}
+          savingPlaceId={savingPlaceId}
+          onSelect={setSelectedPlaceId}
+          onHover={setHoveredPlaceId}
+          onSave={handleSave}
+        />
+      </div>
+    </div>
+  );
+}
