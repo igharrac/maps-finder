@@ -54,7 +54,6 @@ export function ProspectMap({
   const circleRef = useRef<google.maps.Circle | null>(null);
   const markerLibRef = useRef<google.maps.MarkerLibrary | null>(null);
   const geometryRef = useRef<google.maps.GeometryLibrary | null>(null);
-  const initStartedRef = useRef(false);
 
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -62,11 +61,12 @@ export function ProspectMap({
 
   // --- kaart initialiseren -------------------------------------------------
   useEffect(() => {
-    // initStartedRef wordt synchroon gezet: mapRef vult zich pas nadat de
-    // libraries geladen zijn, en tegen die tijd is het effect al opnieuw
-    // gedraaid.
-    if (!containerRef.current || initStartedRef.current || !apiKey) return;
-    initStartedRef.current = true;
+    // React draait dit effect in development twee keer. De eerste ronde wordt
+    // door de cleanup geannuleerd en maakt dus niets aan; de tweede bouwt de
+    // kaart. Niet blokkeren op een "al gestart"-vlag daarom: dan annuleert
+    // ronde één zichzelf en komt ronde twee er niet doorheen, en blijft het
+    // scherm leeg.
+    if (!containerRef.current || mapRef.current || !apiKey) return;
     let cancelled = false;
 
     if (!mapsOptionsSet) {
