@@ -19,6 +19,13 @@ type Props = {
   onSearchThisArea: (center: { lat: number; lng: number }, radiusMeters: number) => void;
 };
 
+/**
+ * setOptions() geldt voor de hele pagina en accepteert maar één aanroep. In
+ * development draait React elk effect twee keer, dus zonder deze vlag klaagt de
+ * loader bij de tweede aanroep.
+ */
+let mapsOptionsSet = false;
+
 const LEGEND_ORDER: MarkerStyleKey[] = [
   'new',
   'interesting',
@@ -47,6 +54,7 @@ export function ProspectMap({
   const circleRef = useRef<google.maps.Circle | null>(null);
   const markerLibRef = useRef<google.maps.MarkerLibrary | null>(null);
   const geometryRef = useRef<google.maps.GeometryLibrary | null>(null);
+  const initStartedRef = useRef(false);
 
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -54,10 +62,17 @@ export function ProspectMap({
 
   // --- kaart initialiseren -------------------------------------------------
   useEffect(() => {
-    if (!containerRef.current || mapRef.current || !apiKey) return;
+    // initStartedRef wordt synchroon gezet: mapRef vult zich pas nadat de
+    // libraries geladen zijn, en tegen die tijd is het effect al opnieuw
+    // gedraaid.
+    if (!containerRef.current || initStartedRef.current || !apiKey) return;
+    initStartedRef.current = true;
     let cancelled = false;
 
-    setOptions({ key: apiKey, v: 'weekly', language: 'nl', region: 'NL' });
+    if (!mapsOptionsSet) {
+      setOptions({ key: apiKey, v: 'weekly', language: 'nl', region: 'NL' });
+      mapsOptionsSet = true;
+    }
 
     (async () => {
       try {
@@ -137,9 +152,11 @@ export function ProspectMap({
         position: { lat: result.place.lat, lng: result.place.lng },
         content: createMarkerElement(result.markerStyle, { title: result.place.name }),
         title: result.place.name,
+        gmpClickable: true,
       });
 
-      marker.addListener('click', () => onSelect(result.place.placeId));
+      // Advanced markers gebruiken gmp-click; het gewone click-event is verouderd.
+      marker.addListener('gmp-click', () => onSelect(result.place.placeId));
       markersRef.current.set(result.place.placeId, marker);
       return marker;
     });
