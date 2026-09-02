@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
-    "lib/enrichment/detectors.test.ts"
+    "lib/enrichment/detectors.test.ts",
+    "lib/flyer/observations.test.ts"
   ]
 }

@@ -190,11 +190,11 @@ export function ResultsList({
                   <button
                     type="button"
                     onClick={() => onAnalyze(result)}
-                    disabled={analyzingPlaceId === result.place.placeId || !result.place.websiteUri}
+                    disabled={analyzingPlaceId === result.place.placeId}
                     title={
                       result.place.websiteUri
                         ? 'Haalt de website op en zoekt naar signalen'
-                        : 'Geen website bekend bij Google'
+                        : 'Geen website bij Google — dat is op zichzelf al een bevinding'
                     }
                     className="rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2 hover:border-line-strong disabled:opacity-50"
                   >

@@ -36,6 +36,15 @@ type Builder = (signal: Signal, place: PlaceSummary) => Observation | null;
  * een gemis is iets om over te praten, "u heeft wel een formulier" niet.
  */
 const BUILDERS: Record<string, Builder> = {
+  // Het sterkste dat je kunt aantreffen. Bewust geformuleerd als "bij Google
+  // staat er geen", want een bedrijf kan best een site hebben die alleen niet
+  // aan zijn Google-vermelding hangt — en dat is dan óók iets om te bespreken.
+  no_website_listed: () => ({
+    key: 'no_website_listed',
+    title: 'Bij Google staat geen website bij uw bedrijf',
+    body: 'Wie u opzoekt en wil vergelijken, vindt alleen een adres en een telefoonnummer.',
+  }),
+
   has_request_form: (signal) =>
     signal.normalized === 0
       ? {
@@ -79,7 +88,7 @@ const BUILDERS: Record<string, Builder> = {
 };
 
 /** Volgorde waarin waarnemingen op de flyer komen; sterkste eerst. */
-const PRIORITY = ['has_request_form', 'shows_reviews', 'mobile_friendly', 'https'];
+const PRIORITY = ['no_website_listed', 'has_request_form', 'shows_reviews', 'mobile_friendly', 'https'];
 
 export function observationsForFlyer(
   signals: Signal[],
@@ -136,7 +145,12 @@ export function flyerReadiness(
 
   const observations = observationsForFlyer(signals, place);
 
-  if (observations.length < MIN_OBSERVATIONS) {
+  // Eén bevinding is normaal te mager, maar "geen website" is op zichzelf al
+  // een heel gesprek waard. Dan volstaat die ene.
+  const onlyNoWebsite =
+    observations.length === 1 && observations[0].key === 'no_website_listed';
+
+  if (observations.length < MIN_OBSERVATIONS && !onlyNoWebsite) {
     return {
       ready: false,
       observations,

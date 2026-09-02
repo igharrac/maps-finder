@@ -50,11 +50,22 @@ export async function POST(
     );
   }
 
+  // Geen website is geen reden om te stoppen — het is de sterkste bevinding die
+  // er is. We leggen hem vast als feit en zijn daarmee klaar met analyseren.
   if (!place.websiteUri) {
-    return NextResponse.json(
-      { error: 'Dit bedrijf heeft geen website bij Google staan, dus valt er niets te analyseren.' },
-      { status: 422 },
-    );
+    const signals = [
+      {
+        key: 'no_website_listed',
+        kind: 'fact' as const,
+        label: 'Bij Google staat geen website bij dit bedrijf',
+        value: { checked: new Date().toISOString() },
+        normalized: 0,
+        confidence: 1,
+        detectedBy: 'website_probe',
+      },
+    ];
+    const score = await persist(supabase, prospect.id, place, signals);
+    return NextResponse.json({ signals, score });
   }
 
   let signals;

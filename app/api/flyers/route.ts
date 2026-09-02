@@ -116,6 +116,10 @@ export async function POST(request: Request) {
         signal.normalized = v && v.marker ? 1 : 0;
       } else if (signal.key === 'https') {
         signal.normalized = typeof v?.url === 'string' && v.url.startsWith('https://') ? 1 : 0;
+      } else if (signal.key === 'no_website_listed') {
+        signal.normalized = 0;
+      } else if (signal.key === 'has_website') {
+        signal.normalized = signal.value ? 1 : 0;
       } else if (signal.key === 'site_reachable') {
         signal.normalized = v && typeof v.status === 'number' && v.status >= 200 && v.status < 400 ? 1 : 0;
       }
