@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from 'react';
 
+import { groupLabels } from '@/lib/categories';
+
 import {
   foundedInfo,
   MARKER_APPEARANCE,
@@ -187,6 +189,15 @@ export function ResultsList({
                 {/* Signalen zijn belangrijker dan het cijfer: dit is wat je in een
                     gesprek gebruikt. */}
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  {groupLabels(result.place.groupIds).map((label) => (
+                    <span
+                      key={label}
+                      className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-2"
+                      title="Branche waarin dit bedrijf gevonden is"
+                    >
+                      {label}
+                    </span>
+                  ))}
                   {(() => {
                     const founded = foundedInfo(result.score.signals);
                     if (!founded) return null;

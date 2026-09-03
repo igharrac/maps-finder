@@ -75,6 +75,7 @@ function toSummary(raw: RawPlace): PlaceSummary | null {
     reviewCount: raw.userRatingCount ?? null,
     websiteUri: raw.websiteUri ?? null,
     businessStatus: raw.businessStatus ?? null,
+    groupIds: [],
   };
 }
 
@@ -140,7 +141,11 @@ export async function searchNearby(params: {
   const buildBody = (types?: string[]): Record<string, unknown> => {
     const body: Record<string, unknown> = {
       maxResultCount: MAX_RESULTS_PER_REQUEST,
-      rankPreference: 'POPULARITY',
+      // DISTANCE en niet POPULARITY: voor het uitkammen van een gebied wil je
+      // alles wat er dichtbij zit, niet de twintig bekendste zaken in de wijde
+      // omtrek. Bij POPULARITY verdringen supermarkten en ketens precies de
+      // kleine bedrijven waar het om gaat.
+      rankPreference: 'DISTANCE',
       languageCode: 'nl',
       regionCode: 'NL',
       locationRestriction: {
@@ -229,4 +234,81 @@ export async function resolveArea(query: string): Promise<AreaResolution | null>
   if (lat === undefined || lng === undefined) return null;
 
   return { label: first?.formatted_address ?? query, lat, lng };
+}
+
+export type SearchGroup = { id: string; types: string[] };
+
+/**
+ * Zoekt per branchegroep apart en voegt de resultaten samen.
+ *
+ * Dit is de kern van waarom één verzoek met alle types niet werkt. Google geeft
+ * maximaal twintig resultaten per verzoek terug. Gooi je achttien types in één
+ * verzoek, dan vullen die twintig plekken zich met wat er het dichtst bij ligt
+ * over ALLE types heen — en dan verdringen kappers, supermarkten en cafés de
+ * installatiebedrijven waar je voor kwam. Meer aanvinken gaf dus minder van wat
+ * je zocht. Precies het tegenovergestelde van de bedoeling.
+ *
+ * Nu krijgt elke groep zijn eigen twintig plekken. Zes groepen aangevinkt is zes
+ * verzoeken en tot 120 resultaten, netjes verdeeld over de branches.
+ *
+ * De prijs is één Places-verzoek per aangevinkte groep in plaats van één in
+ * totaal. Bij het gratis maandtegoed van 5.000 verzoeken is dat ruim voldoende,
+ * en de teller op de kaart laat zien wat je verbruikt.
+ */
+export async function searchGroups(params: {
+  lat: number;
+  lng: number;
+  radiusMeters: number;
+  groups: SearchGroup[];
+}): Promise<PlacesSearchResult> {
+  if (params.groups.length === 0) {
+    return searchNearby({ lat: params.lat, lng: params.lng, radiusMeters: params.radiusMeters });
+  }
+
+  const settled = await Promise.allSettled(
+    params.groups.map((group) =>
+      searchNearby({
+        lat: params.lat,
+        lng: params.lng,
+        radiusMeters: params.radiusMeters,
+        includedTypes: group.types,
+      }).then((result) => ({ group, result })),
+    ),
+  );
+
+  // Eén plek kan in meerdere groepen vallen; die houden we één keer, met alle
+  // groepen erbij zodat de lijst kan laten zien waar hij vandaan komt.
+  const merged = new Map<string, PlaceSummary>();
+  const warnings: string[] = [];
+  let requestCount = 0;
+
+  for (const [index, outcome] of settled.entries()) {
+    const group = params.groups[index];
+
+    if (outcome.status === 'rejected') {
+      requestCount += 1;
+      warnings.push(
+        `De branche "${group.id}" kon niet opgehaald worden; de rest is wel doorzocht.`,
+      );
+      continue;
+    }
+
+    requestCount += outcome.value.result.requestCount;
+    warnings.push(...outcome.value.result.warnings);
+
+    for (const place of outcome.value.result.places) {
+      const existing = merged.get(place.placeId);
+      if (existing) {
+        if (!existing.groupIds.includes(group.id)) existing.groupIds.push(group.id);
+      } else {
+        merged.set(place.placeId, { ...place, groupIds: [group.id] });
+      }
+    }
+  }
+
+  if (merged.size === 0 && warnings.length === settled.length) {
+    throw new PlacesError('Geen enkele branche kon opgehaald worden.', 502);
+  }
+
+  return { places: [...merged.values()], requestCount, warnings: [...new Set(warnings)] };
 }

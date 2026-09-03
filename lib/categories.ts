@@ -97,3 +97,10 @@ export const CATEGORY_GROUPS: CategoryGroup[] = [
 
 export const PRIMARY_GROUPS = CATEGORY_GROUPS.filter((g) => !g.secondary);
 export const SECONDARY_GROUPS = CATEGORY_GROUPS.filter((g) => g.secondary);
+
+const LABEL_BY_ID = new Map(CATEGORY_GROUPS.map((g) => [g.id, g.label]));
+
+/** Namen van de branchegroepen waarin een bedrijf gevonden is. */
+export function groupLabels(groupIds: string[]): string[] {
+  return groupIds.map((id) => LABEL_BY_ID.get(id) ?? id);
+}

@@ -119,9 +119,9 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
             </div>
           ) : null}
           <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
-            Alle branches gaan in één zoekverzoek, maar Google geeft er hooguit
-            twintig terug. Meer aanvinken betekent dus niet meer resultaten, wel
-            een bredere mix.
+            Elke branche krijgt een eigen zoekverzoek met een eigen twintig
+            resultaten, zodat kleine bedrijven niet verdrongen worden door grote.
+            Meer aanvinken geeft dus meer resultaten, en kost ook meer verzoeken.
           </p>
         </fieldset>
 

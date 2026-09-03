@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import { MarkerClusterer } from '@googlemaps/markerclusterer';
+import { groupLabels } from '@/lib/categories';
 import {
   foundedInfo,
   MARKER_APPEARANCE,
@@ -310,13 +311,21 @@ export function ProspectMap({
             <span className="ml-auto font-medium">{STATUS_LABELS[tooltip.result.status]}</span>
           </div>
 
-          {(() => {
-            const founded = foundedInfo(tooltip.result.score.signals);
-            if (!founded) return null;
-            return (
-              <p className="mt-1.5 text-[11px] font-medium text-accent">{founded.label}</p>
-            );
-          })()}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {groupLabels(tooltip.result.place.groupIds).map((label) => (
+              <span
+                key={label}
+                className="rounded border border-line bg-surface-2 px-1.5 py-0.5 text-[10px] font-medium text-ink-2"
+              >
+                {label}
+              </span>
+            ))}
+            {(() => {
+              const founded = foundedInfo(tooltip.result.score.signals);
+              if (!founded) return null;
+              return <span className="text-[11px] font-medium text-accent">{founded.label}</span>;
+            })()}
+          </div>
 
           {tooltip.result.score.signals.filter((s) => s.kind === 'fact').length ? (
             <ul className="mt-2 flex flex-col gap-1 border-t border-surface-2 pt-2">

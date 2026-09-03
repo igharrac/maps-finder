@@ -17,6 +17,8 @@ export type PlaceSummary = {
   reviewCount: number | null;
   websiteUri: string | null;
   businessStatus: string | null;
+  /** Ids van de branchegroepen waarin dit bedrijf gevonden is. */
+  groupIds: string[];
 };
 
 export type AreaResolution = {

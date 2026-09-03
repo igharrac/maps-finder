@@ -40,14 +40,21 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [requestCount, setRequestCount] = useState(0);
 
-  const includedTypes = useMemo(
+  const searchGroupsPayload = useMemo(
     () =>
-      CATEGORY_GROUPS.filter((g) => filters.categoryIds.includes(g.id)).flatMap((g) => g.types),
+      CATEGORY_GROUPS.filter((g) => filters.categoryIds.includes(g.id)).map((g) => ({
+        id: g.id,
+        types: g.types,
+      })),
     [filters.categoryIds],
   );
 
   const runSearch = useCallback(
-    async (at: { lat: number; lng: number }, radius: number, types: string[]) => {
+    async (
+      at: { lat: number; lng: number },
+      radius: number,
+      groups: Array<{ id: string; types: string[] }>,
+    ) => {
       setSearching(true);
       setError(null);
       setWarnings([]);
@@ -60,7 +67,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
             lat: at.lat,
             lng: at.lng,
             radiusMeters: radius,
-            includedTypes: types.length ? types : undefined,
+            groups: groups.length ? groups : undefined,
           }),
         });
 
@@ -100,23 +107,23 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
         setCenter(next);
         setRadiusMeters(radius);
         setAreaLabel(data.label as string);
-        await runSearch(next, radius, includedTypes);
+        await runSearch(next, radius, searchGroupsPayload);
       } catch {
         setError('Locatie opzoeken mislukt.');
       } finally {
         setResolving(false);
       }
     },
-    [includedTypes, runSearch],
+    [searchGroupsPayload, runSearch],
   );
 
   const handleSearchThisArea = useCallback(
     (at: { lat: number; lng: number }, radius: number) => {
       setCenter(at);
       setRadiusMeters(radius);
-      void runSearch(at, radius, includedTypes);
+      void runSearch(at, radius, searchGroupsPayload);
     },
-    [includedTypes, runSearch],
+    [searchGroupsPayload, runSearch],
   );
 
   const handleSave = useCallback(async (result: SearchResult) => {

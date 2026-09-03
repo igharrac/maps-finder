@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { PlacesError, searchNearby } from '@/lib/places/client';
+import { PlacesError, searchGroups } from '@/lib/places/client';
 import { scorePlace } from '@/lib/scoring';
 import { createClient } from '@/lib/supabase/server';
 import { markerStyleFor, type ProspectStatus } from '@/lib/types';
@@ -9,8 +9,17 @@ const bodySchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
   radiusMeters: z.number().min(100).max(50_000),
-  // Google accepteert er maximaal 50 in één verzoek.
-  includedTypes: z.array(z.string().min(1).max(60)).max(50).optional(),
+  // Elke branchegroep krijgt zijn eigen verzoek, zodat de twintig resultaten
+  // per groep gelden en niet over alle branches samen.
+  groups: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(40),
+        types: z.array(z.string().min(1).max(60)).min(1).max(50),
+      }),
+    )
+    .max(12)
+    .optional(),
 });
 
 /** Meters tussen twee coördinaten (haversine). */
@@ -58,14 +67,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 });
   }
 
-  const { lat, lng, radiusMeters, includedTypes } = parsed.data;
+  const { lat, lng, radiusMeters, groups } = parsed.data;
 
   try {
-    const { places, requestCount, warnings } = await searchNearby({
+    const { places, requestCount, warnings } = await searchGroups({
       lat,
       lng,
       radiusMeters,
-      includedTypes,
+      groups: groups ?? [],
     });
 
     // Welke van deze bedrijven kennen we al? Voorkomt dat een bedrijf dat al

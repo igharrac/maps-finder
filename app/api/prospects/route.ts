@@ -15,6 +15,7 @@ const placeSchema = z.object({
   reviewCount: z.number().nullable(),
   websiteUri: z.string().nullable(),
   businessStatus: z.string().nullable(),
+  groupIds: z.array(z.string()).default([]),
 });
 
 const bodySchema = z.object({
