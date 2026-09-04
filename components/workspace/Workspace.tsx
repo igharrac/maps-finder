@@ -190,7 +190,11 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? 'Analyse mislukt.');
+        setError(
+          data.checkedUrl
+            ? `${result.place.name}: ${data.error} (gecontroleerd: ${data.checkedUrl})`
+            : (data.error ?? 'Analyse mislukt.'),
+        );
         return;
       }
 

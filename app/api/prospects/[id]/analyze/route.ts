@@ -74,10 +74,26 @@ export async function POST(
     signals = detectSignals(page);
   } catch (error) {
     if (error instanceof FetchSiteError) {
-      // Een onbereikbare site is zelf een signaal, geen fout in ons systeem.
+      // Cruciaal onderscheid. Een domein dat niet bestaat of een server die een
+      // 500 geeft, zegt iets over het bedrijf. Geweigerd worden door een
+      // beveiliging zegt alleen iets over ONS verzoek — de site doet het dan
+      // waarschijnlijk prima. Dat als "website onbereikbaar" vastleggen zou een
+      // onwaarheid de database in schrijven, en uiteindelijk op papier zetten.
+      if (!error.isAboutTheBusiness) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            reason: error.reason,
+            status: error.status ?? null,
+            checkedUrl: place.websiteUri,
+          },
+          { status: 502 },
+        );
+      }
+
       signals = detectSignals({
         url: place.websiteUri,
-        status: 0,
+        status: error.status ?? 0,
         html: '',
         headers: {},
         elapsedMs: 0,
