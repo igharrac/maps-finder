@@ -82,17 +82,35 @@ check('geen website MET sterke reputatie is wel genoeg', () => {
   assert.match(r.observations[0].body, /alleen op Google/);
 });
 
+check('klein bedrijf met acht reviews en een 4,8 telt als bezit', () => {
+  const r = flyerReadiness(
+    [REACHABLE, probe('shows_reviews', 0, 0.7), probe('has_request_form', 0, 0.65)],
+    place({ reviewCount: 8, rating: 4.8 }),
+  );
+  assert.equal(r.ready, true);
+  assert.match(r.observations[0].title, /8 klanten/);
+});
+
+check('vier reviews met een 4,8 is te mager', () => {
+  const r = flyerReadiness(
+    [REACHABLE, probe('shows_reviews', 0, 0.7), probe('has_request_form', 0, 0.65)],
+    place({ reviewCount: 4, rating: 4.8 }),
+  );
+  assert.equal(r.ready, false);
+  assert.match(r.reason ?? '', /4 reviews met een 4,8/);
+});
+
 check('lang bestaan telt als bezit', () => {
   const r = flyerReadiness(
     [
       REACHABLE,
       probe('mobile_friendly', 0),
-      probe('founded_year', 0, 0.6, { year: 1995, ageYears: 31 }),
+      probe('founded_year', 0, 0.6, { year: 2013, ageYears: 13 }),
     ],
     place({ reviewCount: 2, rating: 3.0 }),
   );
   assert.equal(r.ready, true);
-  assert.match(r.observations[0].title, /31 jaar/);
+  assert.match(r.observations[0].title, /13 jaar/);
 });
 
 check('site op orde levert geen flyer op', () => {

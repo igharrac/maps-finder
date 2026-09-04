@@ -64,8 +64,14 @@ function assets(signals: Signal[], place: PlaceSummary): Observation[] {
   const rating = place.rating;
   const noWebsite = lacks(signals, 'no_website_listed') || !place.websiteUri;
 
-  // Een sterke reputatie die nergens werkt is de krachtigste opening die er is.
-  if (reviewCount >= 20 && rating !== null && rating >= 4 && (noWebsite || lacks(signals, 'shows_reviews'))) {
+  // Twee drempels, want een klein bedrijf met acht reviews en een 4,8 heeft net
+  // zo goed iets opgebouwd als een groot bedrijf met honderd en een 4,1. De
+  // eerste versie eiste er twintig en liet daarmee precies de kleine
+  // installatiebedrijven vallen waar het om gaat.
+  const strongReputation =
+    rating !== null && ((reviewCount >= 20 && rating >= 4.0) || (reviewCount >= 8 && rating >= 4.2));
+
+  if (strongReputation && rating !== null && (noWebsite || lacks(signals, 'shows_reviews'))) {
     found.push({
       key: 'reputation_unused',
       kind: 'asset',
@@ -78,7 +84,7 @@ function assets(signals: Signal[], place: PlaceSummary): Observation[] {
 
   const founded = signalValue(signals, 'founded_year');
   const foundedValue = founded?.value as { year?: number; ageYears?: number } | undefined;
-  if (foundedValue?.year && (foundedValue.ageYears ?? 0) >= 15) {
+  if (foundedValue?.year && (foundedValue.ageYears ?? 0) >= 10) {
     found.push({
       key: 'long_established',
       kind: 'asset',
@@ -184,12 +190,21 @@ export function flyerReadiness(
   }
 
   if (owned.length === 0) {
+    const count = place.reviewCount ?? 0;
+    const rating = place.rating;
+    const reputation =
+      rating === null
+        ? 'geen rating'
+        : `${count} reviews met een ${rating.toFixed(1).replace('.', ',')}`;
+    const age = signalValue(signals, 'founded_year') ? '' : ', geen oprichtingsjaar op de site';
+
     return {
       ready: false,
       observations: [],
       reason:
-        'Wel gemissen gevonden, maar niets dat dit bedrijf al heeft opgebouwd. Een flyer ' +
-        'die alleen opsomt wat er ontbreekt is kritiek van een vreemde — gebruik de generieke.',
+        `Wel gemissen gevonden, maar niets dat dit bedrijf al heeft opgebouwd ` +
+        `(${reputation}${age}). Een flyer die alleen opsomt wat er ontbreekt is kritiek ` +
+        `van een vreemde — gebruik de generieke.`,
     };
   }
 
