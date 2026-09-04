@@ -30,6 +30,7 @@ type Props = {
   onReject: (result: SearchResult) => void;
   onAnalyze: (result: SearchResult) => void;
   onToggleFlyer: (prospectId: string) => void;
+  onPreviewFlyer: (result: SearchResult) => void;
 };
 
 /**
@@ -64,6 +65,7 @@ export function ResultsList({
   onReject,
   onAnalyze,
   onToggleFlyer,
+  onPreviewFlyer,
 }: Props) {
   const rowsRef = useRef(new Map<string, HTMLLIElement>());
 
@@ -309,27 +311,27 @@ export function ResultsList({
                   </button>
                 ) : null}
                 {result.prospectId ? (
-                  <label
-                    className={
-                      result.status === 'discovered' || result.status === 'saved'
-                        ? 'flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-3 opacity-50'
-                        : 'flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-[11px] text-ink-2'
-                    }
-                    title={
-                      result.status === 'discovered' || result.status === 'saved'
-                        ? 'Analyseer eerst de site — zonder bevindingen valt er niets te personaliseren'
-                        : 'Meenemen in de gepersonaliseerde flyers'
-                    }
-                  >
-                    <input
-                      type="checkbox"
-                      disabled={result.status === 'discovered' || result.status === 'saved'}
-                      checked={flyerSelection.includes(result.prospectId)}
-                      onChange={() => onToggleFlyer(result.prospectId!)}
-                      className="h-3 w-3 accent-[var(--color-accent)]"
-                    />
-                    Flyer
-                  </label>
+                  <span className="flex items-center rounded-md border border-line">
+                    <label
+                      className="flex cursor-pointer items-center pl-2"
+                      title="Meenemen in de bundel onderaan"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={flyerSelection.includes(result.prospectId)}
+                        onChange={() => onToggleFlyer(result.prospectId!)}
+                        className="h-3 w-3 accent-[var(--color-accent)]"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => onPreviewFlyer(result)}
+                      title="Bekijk de flyer voor dit bedrijf — persoonlijk als het kan, anders de generieke"
+                      className="px-2 py-1 text-[11px] text-ink-2 hover:text-ink"
+                    >
+                      Flyer bekijken
+                    </button>
+                  </span>
                 ) : null}
                 {result.prospectId ? (
                   <button

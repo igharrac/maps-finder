@@ -353,6 +353,61 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
     }
   }, [flyerSelection]);
 
+  /**
+   * Opent de flyer voor één bedrijf in een nieuw tabblad.
+   *
+   * De server bepaalt of het de persoonlijke of de generieke wordt; deze knop
+   * levert dus altijd iets op. Het tabblad wordt vooraf geopend, want browsers
+   * blokkeren window.open na een await als het geen directe reactie meer is op
+   * een klik.
+   */
+  const handlePreviewFlyer = useCallback(async (result: SearchResult) => {
+    if (!result.prospectId) return;
+    setError(null);
+    setWarnings([]);
+
+    const tab = window.open('', '_blank');
+
+    try {
+      const response = await fetch(`/api/flyers/preview?prospectId=${result.prospectId}`);
+
+      if (!response.ok) {
+        tab?.close();
+        const data = await response.json().catch(() => ({}));
+        setError(data.error ?? 'Flyer maken mislukt.');
+        return;
+      }
+
+      const variant = response.headers.get('X-Flyer-Variant');
+      const reason = decodeURIComponent(response.headers.get('X-Flyer-Reason') ?? '');
+
+      if (variant === 'generic') {
+        setWarnings([
+          reason
+            ? `Generieke flyer getoond voor ${result.place.name} — ${reason}`
+            : `Generieke flyer getoond voor ${result.place.name}.`,
+        ]);
+      }
+
+      const url = URL.createObjectURL(await response.blob());
+      if (tab) {
+        tab.location.href = url;
+      } else {
+        // Pop-upblokkering: dan maar downloaden.
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `flyer-${result.place.name}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      tab?.close();
+      setError('Flyer maken mislukt.');
+    }
+  }, []);
+
   const visible = useMemo(() => {
     const filtered = results.filter((r) => {
       if (r.score.opportunityScore < filters.minScore) return false;
@@ -456,6 +511,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
           onReject={handleReject}
           onAnalyze={handleAnalyze}
           onToggleFlyer={toggleFlyer}
+          onPreviewFlyer={handlePreviewFlyer}
         />
       </div>
 

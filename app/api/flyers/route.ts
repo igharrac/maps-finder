@@ -6,9 +6,9 @@ import { RenderError, renderPdf } from '@/lib/flyer/render';
 import { senderFromEnv } from '@/lib/flyer/sender';
 import { buildFlyerHtml, type FlyerData } from '@/lib/flyer/template';
 import type { PlaceSummary } from '@/lib/places/types';
-import type { Signal } from '@/lib/scoring/signals';
 import { createClient } from '@/lib/supabase/server';
 import { generateTrackingCode } from '@/lib/tracking';
+import { normalizeStoredSignals } from '@/lib/flyer/signals';
 
 export const maxDuration = 60;
 
@@ -87,43 +87,7 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const signals = ((row.prospect_signals ?? []) as unknown as Array<{
-      key: string;
-      kind: Signal['kind'];
-      label: string;
-      value: unknown;
-      confidence: number;
-      detected_by: string;
-    }>).map<Signal>((s) => ({
-      key: s.key,
-      kind: s.kind,
-      label: s.label,
-      value: s.value,
-      normalized: null,
-      confidence: s.confidence,
-      detectedBy: s.detected_by,
-    }));
-
-    // normalized wordt niet opgeslagen; voor de flyer leiden we het terug af uit
-    // de waarde, want alleen het ontbreken van iets is de moeite van drukken waard.
-    for (const signal of signals) {
-      const v = signal.value as Record<string, unknown> | null;
-      if (signal.key === 'has_request_form') {
-        signal.normalized = v && v.formCount && v.matchedKeyword ? 1 : 0;
-      } else if (signal.key === 'mobile_friendly') {
-        signal.normalized = v && v.hasViewport ? 1 : 0;
-      } else if (signal.key === 'shows_reviews') {
-        signal.normalized = v && v.marker ? 1 : 0;
-      } else if (signal.key === 'https') {
-        signal.normalized = typeof v?.url === 'string' && v.url.startsWith('https://') ? 1 : 0;
-      } else if (signal.key === 'no_website_listed') {
-        signal.normalized = 0;
-      } else if (signal.key === 'has_website') {
-        signal.normalized = signal.value ? 1 : 0;
-      } else if (signal.key === 'site_reachable') {
-        signal.normalized = v && typeof v.status === 'number' && v.status >= 200 && v.status < 400 ? 1 : 0;
-      }
-    }
+    const signals = normalizeStoredSignals(row.prospect_signals);
 
     const readiness = flyerReadiness(signals, place);
     if (!readiness.ready) {

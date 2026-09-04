@@ -215,6 +215,74 @@ function back(sender: Sender): string {
 }
 
 /**
+ * De generieke voorkant: dezelfde boodschap, zonder bedrijfsspecifieke kansen.
+ *
+ * Deze is er altijd. Een bedrijf dat niet in aanmerking komt voor een eigen
+ * flyer — niet geanalyseerd, site op orde, of te weinig gevonden — mag nooit
+ * een doodlopende knop opleveren. Dan krijg je deze.
+ */
+function genericFront(sender: Sender, qrSvg: string): string {
+  const points = [
+    ['Minder handmatig werk', 'Terugkerende taken en administratie eenvoudiger inrichten.'],
+    ['Meer inzicht in je bedrijf', 'Klanten, omzet en processen overzichtelijk bij elkaar.'],
+    ['Slimmer omgaan met klantvragen', 'Aanvragen sneller binnenkrijgen en opvolgen.'],
+    ['Praktisch starten met AI', 'Klein beginnen, kijken wat het echt oplevert.'],
+  ]
+    .map(
+      ([title, body]) => `
+      <div style="display:flex;gap:11px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${C.pine}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:3px;"><path d="m5 13 4 4L19 7"></path></svg>
+        <div>
+          <div style="font-size:17px;font-weight:600;line-height:1.3;">${title}</div>
+          <div style="font-size:16px;line-height:1.45;color:${C.body};margin-top:2px;">${body}</div>
+        </div>
+      </div>`,
+    )
+    .join('');
+
+  return `<div style="width:${TRIM_W}px;height:${TRIM_H}px;background:${C.paper};color:${C.ink};display:flex;flex-direction:column;overflow:hidden;">
+  <div style="flex-grow:1;padding:44px 44px 0;display:flex;flex-direction:column;">
+    <div style="font-size:13px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${C.ochre};">Voor lokale ondernemers</div>
+
+    <div style="font-size:34px;font-weight:700;line-height:1.14;letter-spacing:-0.02em;margin-top:12px;max-width:430px;">Waar kan jullie bedrijf slimmer werken?</div>
+
+    <div style="width:56px;height:4px;background:${C.pine};margin-top:22px;"></div>
+
+    <div style="font-size:16px;line-height:1.55;color:${C.body};margin-top:20px;max-width:445px;">
+      Veel bedrijven zien kansen in digitalisering en AI, maar niet altijd waar te beginnen. Wij kijken praktisch met je mee naar processen, klanten en systemen — zonder dat je zelf technisch hoeft te zijn.
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:15px;margin-top:26px;">${points}</div>
+
+    <div style="flex-grow:1;"></div>
+  </div>
+
+  <div style="flex-shrink:0;background:${C.pine};color:#FFFFFF;padding:20px 44px 22px;">
+    <div style="display:flex;align-items:center;gap:20px;">
+      <div style="flex-shrink:0;width:78px;height:78px;border-radius:8px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;">${qrSvg}</div>
+      <div style="flex-grow:1;">
+        <div style="font-size:19px;font-weight:600;line-height:1.3;">Benieuwd wat er voor jullie mogelijk is?</div>
+        <div style="font-size:15px;line-height:1.45;opacity:0.86;margin-top:4px;">We denken graag 30 minuten vrijblijvend mee.</div>
+        <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em;margin-top:10px;">${escapeHtml(sender.phone)}</div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.22);font-size:14.5px;">
+      <span style="font-weight:600;">${escapeHtml(sender.name)}</span>
+      <span style="opacity:0.5;">&middot;</span>
+      <span style="opacity:0.84;">${escapeHtml(sender.website)}</span>
+      <span style="margin-left:auto;opacity:0.84;">${escapeHtml(sender.email)}</span>
+    </div>
+  </div>
+</div>`;
+}
+
+/** De generieke flyer: voorkant zonder kansen, plus dezelfde achterkant. */
+export function buildGenericFlyerHtml(sender: Sender, qrSvg: string): string {
+  return wrapPages([genericFront(sender, qrSvg), back(sender)]);
+}
+
+/**
  * Bouwt het document. Per bedrijf een voorkant, en aan het eind één achterkant.
  *
  * Dat is bewust: de achterkant is voor iedereen gelijk, dus die laat je in
@@ -234,6 +302,11 @@ export function buildFlyerHtml(
   }
   if (!options.interleave && sender) pages.push(back(sender));
 
+  return wrapPages(pages);
+}
+
+/** Zet pagina's in het A5-raamwerk met afloop en ingesloten fonts. */
+function wrapPages(pages: string[]): string {
   const sheets = pages
     .map((page) => `<div class="sheet"><div class="bleed-bottom"></div><div class="art">${page}</div></div>`)
     .join('\n');
