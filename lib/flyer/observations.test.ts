@@ -1,16 +1,16 @@
 /**
- * Test wanneer een bedrijf een eigen flyer krijgt, en wat erop komt.
+ * Test welke kansen op een flyer belanden, en hoe ze geformuleerd zijn.
  *
  *   node --experimental-strip-types lib/flyer/observations.test.ts
  *
- * De kernregel: een flyer moet minstens één BEZIT bevatten naast een GEMIS. Een
- * flyer die alleen opsomt wat iemand mist is kritiek van een vreemde; die gaat
- * niet over zijn bedrijf.
+ * De toonregels zijn hier net zo belangrijk als de logica: de doelgroep is niet
+ * digitaal gedreven en vaak onzeker over AI. Een lijstje met wat er mis is werkt
+ * averechts, hoe feitelijk het ook klopt.
  */
 import assert from 'node:assert/strict';
 import type { PlaceSummary } from '../places/types.ts';
 import type { Signal } from '../scoring/signals.ts';
-import { flyerReadiness } from './observations.ts';
+import { flyerReadiness, observationsForFlyer } from './observations.ts';
 
 function place(overrides: Partial<PlaceSummary> = {}): PlaceSummary {
   return {
@@ -47,82 +47,80 @@ function check(name: string, fn: () => void) {
   }
 }
 
-check('reputatie + gemis levert een flyer op, bezit eerst', () => {
+const ALL_TONE_WORDS = /verkeerd|fout|mist|ontbreekt|geen |slecht|achter/i;
+
+check('twee kansen leveren een flyer op', () => {
   const r = flyerReadiness(
-    [REACHABLE, probe('shows_reviews', 0, 0.7), probe('has_request_form', 0, 0.65)],
+    [REACHABLE, probe('has_request_form', 0, 0.65), probe('shows_reviews', 0, 0.7)],
     place(),
   );
   assert.equal(r.ready, true);
-  assert.equal(r.observations[0].kind, 'asset');
-  assert.match(r.observations[0].title, /128 klanten/);
-  assert.equal(r.observations[1].kind, 'gap');
+  assert.equal(r.observations.length, 3, 'twee onderbouwd plus de AI-suggestie');
 });
 
-check('alleen gemissen levert GEEN flyer op', () => {
-  const r = flyerReadiness(
+check('één kans is te mager', () => {
+  const r = flyerReadiness([REACHABLE, probe('mobile_friendly', 0)], place());
+  assert.equal(r.ready, false);
+  assert.match(r.reason ?? '', /één kans/);
+});
+
+check('de AI-suggestie staat nooit alleen', () => {
+  const obs = observationsForFlyer([REACHABLE, probe('mobile_friendly', 0)], place());
+  assert.equal(obs.length, 0);
+});
+
+check('bij drie onderbouwde kansen valt de AI-suggestie weg', () => {
+  const obs = observationsForFlyer(
+    [REACHABLE, probe('has_request_form', 0, 0.65), probe('shows_reviews', 0, 0.7), probe('mobile_friendly', 0)],
+    place(),
+  );
+  assert.equal(obs.length, 3);
+  assert.equal(obs.every((o) => o.groundedIn !== null), true, 'alles onderbouwd');
+});
+
+check('titels benoemen een uitkomst, geen gemis', () => {
+  const obs = observationsForFlyer(
     [REACHABLE, probe('has_request_form', 0, 0.65), probe('mobile_friendly', 0), probe('https', 0)],
-    place({ rating: 3.1, reviewCount: 4 }),
-  );
-  assert.equal(r.ready, false);
-  assert.match(r.reason ?? '', /opgebouwd|kritiek/);
-});
-
-check('geen website is alleen niet genoeg', () => {
-  const r = flyerReadiness([probe('no_website_listed', 0)], place({ websiteUri: null, reviewCount: 3, rating: 3.2 }));
-  assert.equal(r.ready, false);
-});
-
-check('geen website MET sterke reputatie is wel genoeg', () => {
-  const r = flyerReadiness(
-    [probe('no_website_listed', 0)],
-    place({ websiteUri: null, reviewCount: 128, rating: 4.6 }),
-  );
-  assert.equal(r.ready, true);
-  assert.equal(r.observations[0].kind, 'asset');
-  assert.match(r.observations[0].body, /alleen op Google/);
-});
-
-check('klein bedrijf met acht reviews en een 4,8 telt als bezit', () => {
-  const r = flyerReadiness(
-    [REACHABLE, probe('shows_reviews', 0, 0.7), probe('has_request_form', 0, 0.65)],
-    place({ reviewCount: 8, rating: 4.8 }),
-  );
-  assert.equal(r.ready, true);
-  assert.match(r.observations[0].title, /8 klanten/);
-});
-
-check('vier reviews met een 4,8 is te mager', () => {
-  const r = flyerReadiness(
-    [REACHABLE, probe('shows_reviews', 0, 0.7), probe('has_request_form', 0, 0.65)],
-    place({ reviewCount: 4, rating: 4.8 }),
-  );
-  assert.equal(r.ready, false);
-  assert.match(r.reason ?? '', /4 reviews met een 4,8/);
-});
-
-check('lang bestaan telt als bezit', () => {
-  const r = flyerReadiness(
-    [
-      REACHABLE,
-      probe('mobile_friendly', 0),
-      probe('founded_year', 0, 0.6, { year: 2013, ageYears: 13 }),
-    ],
-    place({ reviewCount: 2, rating: 3.0 }),
-  );
-  assert.equal(r.ready, true);
-  assert.match(r.observations[0].title, /13 jaar/);
-});
-
-check('site op orde levert geen flyer op', () => {
-  const r = flyerReadiness(
-    [REACHABLE, probe('has_request_form', 1, 0.9), probe('mobile_friendly', 1), probe('shows_reviews', 1, 0.7), probe('https', 1)],
     place(),
   );
-  assert.equal(r.ready, false);
-  assert.match(r.reason ?? '', /op orde/);
+  for (const o of obs) {
+    assert.doesNotMatch(o.title, ALL_TONE_WORDS, `titel klinkt als kritiek: "${o.title}"`);
+  }
 });
 
-check('onbereikbare site levert nooit een flyer op', () => {
+check('geen jargon in titel of tekst', () => {
+  const obs = observationsForFlyer(
+    [REACHABLE, probe('has_request_form', 0, 0.65), probe('shows_reviews', 0, 0.7), probe('mobile_friendly', 0)],
+    place(),
+  );
+  const jargon = /\bAPI\b|machine learning|pipeline|cloud architect|LLM|automation stack|UX method/i;
+  for (const o of obs) {
+    assert.doesNotMatch(`${o.title} ${o.body}`, jargon, `jargon in "${o.title}"`);
+  }
+});
+
+check('elke kans op een waarneming is onderbouwd', () => {
+  const obs = observationsForFlyer(
+    [REACHABLE, probe('has_request_form', 0, 0.65), probe('shows_reviews', 0, 0.7)],
+    place(),
+  );
+  const withFact = obs.filter((o) => o.groundedIn !== null);
+  assert.equal(withFact.length >= 2, true);
+  assert.match(withFact[1].groundedIn ?? '', /128 klanten/);
+});
+
+check('geen website levert een vindbaarheidskans op, niet een verwijt', () => {
+  const obs = observationsForFlyer(
+    [probe('no_website_listed', 0), probe('has_request_form', 0, 0.65)],
+    place({ websiteUri: null }),
+  );
+  const vindbaar = obs.find((o) => o.key === 'vindbaarheid');
+  assert.ok(vindbaar);
+  assert.match(vindbaar.title, /vindbaar/i);
+  assert.doesNotMatch(vindbaar.title, ALL_TONE_WORDS);
+});
+
+check('onbereikbare site levert geen kansen op', () => {
   const r = flyerReadiness([probe('site_reachable', 0)], place());
   assert.equal(r.ready, false);
 });
@@ -136,21 +134,12 @@ check('zonder analyse geen flyer', () => {
   assert.match(r.reason ?? '', /geanalyseerd/);
 });
 
-check('nooit meer dan drie waarnemingen', () => {
-  const r = flyerReadiness(
-    [
-      REACHABLE,
-      probe('shows_reviews', 0, 0.7),
-      probe('founded_year', 0, 0.6, { year: 1995, ageYears: 31 }),
-      probe('has_request_form', 0, 0.65),
-      probe('mobile_friendly', 0),
-      probe('https', 0),
-    ],
+check('nooit meer dan drie kansen', () => {
+  const obs = observationsForFlyer(
+    [REACHABLE, probe('has_request_form', 0, 0.65), probe('shows_reviews', 0, 0.7), probe('mobile_friendly', 0), probe('https', 0)],
     place(),
   );
-  assert.equal(r.ready, true);
-  assert.equal(r.observations.length, 3);
-  assert.equal(r.observations.filter((o) => o.kind === 'gap').length >= 1, true);
+  assert.equal(obs.length, 3);
 });
 
 console.log(failures === 0 ? '\nAlles goed.' : `\n${failures} test(s) mislukt.`);

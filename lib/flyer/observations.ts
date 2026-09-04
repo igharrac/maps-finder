@@ -2,45 +2,61 @@ import type { PlaceSummary } from '@/lib/places/types';
 import type { Signal } from '@/lib/scoring/signals';
 
 /**
- * Zet gedetecteerde signalen om in regels die op een gedrukte flyer mogen.
+ * Zet waarnemingen om in KANSEN die op een flyer mogen.
  *
- * Dit is het gevoeligste stuk van de applicatie. Deze zinnen gaan gedrukt bij
- * iemand door de brievenbus, met zijn bedrijfsnaam erboven.
+ * De toon is het belangrijkste aan dit bestand. De doelgroep bestaat uit
+ * financieel gezonde bedrijven die niet digitaal gedreven zijn, vaak onzeker
+ * over AI, en die niet goed weten waar ze moeten beginnen. Zo iemand een lijstje
+ * sturen met wat er mis is aan zijn website werkt averechts, hoe feitelijk het
+ * ook klopt.
  *
- * Vier regels:
+ * Daarom drie regels over taal:
  *
- * 1. Alleen FEITEN. Gevolgtrekkingen en aanbevelingen komen er niet in.
- * 2. Alleen signalen waar we voldoende zeker van zijn.
- * 3. Elke zin beschrijft wat WIJ hebben waargenomen, niet wat waar is over het
- *    bedrijf. "Wij vonden geen aanvraagformulier" blijft kloppen ook als er een
- *    achter JavaScript zit; "u heeft geen aanvraagformulier" niet.
- * 4. Er moet minstens één BEZIT in staan naast een GEMIS.
+ * 1. Kansen benoemen, geen fouten. Niet "er staat geen aanvraagformulier" maar
+ *    "aanvragen slimmer verwerken".
+ * 2. Voorzichtig formuleren. "Hier lijkt mogelijk winst te behalen", nooit
+ *    "jullie doen dit verkeerd".
+ * 3. Geen jargon. Geen API, machine learning, pipelines of LLM.
  *
- * Die vierde regel is de belangrijkste en kwam er later bij. Een flyer die
- * alleen opsomt wat iemand mist, is een lijstje kritiek van een vreemde. Een
- * flyer die begint bij wat hij heeft opgebouwd — jaren aan tevreden klanten,
- * een reputatie, een lange staat van dienst — en pas dan laat zien waar dat
- * blijft liggen, gaat over zijn bedrijf en niet over onze checklist. "U heeft
- * geen website" is geen boodschap. "128 klanten gaven u een 4,6, en wie u
- * opzoekt vindt alleen een telefoonnummer" wel.
+ * En drie regels over waarheid, die overeind blijven:
+ *
+ * - FACT is wat we daadwerkelijk hebben waargenomen.
+ * - OPPORTUNITY is waar mogelijk een kans ligt.
+ * - SUGGESTION is wat we zouden kunnen onderzoeken.
+ *
+ * Een aanname wordt nooit als feit gepresenteerd. Elke kans hieronder rust op
+ * een waarneming (`groundedIn`); alleen de afsluitende AI-suggestie doet dat
+ * niet, en die mag daarom nooit alleen staan.
  */
 
 const MIN_CONFIDENCE = 0.6;
 
-/** Een waarneming is óf iets dat het bedrijf heeft, óf iets dat ontbreekt. */
-export type ObservationKind = 'asset' | 'gap';
+/** De zes thema's waarin een ondernemer zijn eigen bedrijf herkent. */
+export type ThemeId =
+  | 'slimmer_werken'
+  | 'meer_grip'
+  | 'meer_klanten'
+  | 'betere_dienstverlening'
+  | 'systemen_samen'
+  | 'klaar_voor_ai';
 
 export type Observation = {
   key: string;
-  kind: ObservationKind;
+  theme: ThemeId;
+  /** Uitkomst in de taal van de ondernemer, geen dienst of techniek. */
   title: string;
+  /** Voorzichtig geformuleerd: hier lijkt mogelijk iets te halen. */
   body: string;
+  /**
+   * De waarneming waar deze kans op rust. Leeg bij een algemene suggestie, en
+   * die mag daarom nooit als enige op een flyer staan.
+   */
+  groundedIn: string | null;
 };
 
 function signalValue(signals: Signal[], key: string): Signal | undefined {
   const signal = signals.find((s) => s.key === key);
-  if (!signal) return undefined;
-  if (signal.kind !== 'fact') return undefined;
+  if (!signal || signal.kind !== 'fact') return undefined;
   if (signal.confidence < MIN_CONFIDENCE) return undefined;
   return signal;
 }
@@ -54,104 +70,86 @@ function formatRating(rating: number): string {
 }
 
 /**
- * Wat het bedrijf heeft opgebouwd en nu niet benut. Hier begint de flyer, want
- * dit is het deel dat de ondernemer herkent als van hem.
+ * Kansen die op een waarneming rusten, in volgorde van hoe herkenbaar ze zijn
+ * voor een ondernemer. Aanvragen en klanten eerst; techniek nooit vooraan.
  */
-function assets(signals: Signal[], place: PlaceSummary): Observation[] {
+function grounded(signals: Signal[], place: PlaceSummary): Observation[] {
   const found: Observation[] = [];
-
   const reviewCount = place.reviewCount ?? 0;
   const rating = place.rating;
   const noWebsite = lacks(signals, 'no_website_listed') || !place.websiteUri;
 
-  // Twee drempels, want een klein bedrijf met acht reviews en een 4,8 heeft net
-  // zo goed iets opgebouwd als een groot bedrijf met honderd en een 4,1. De
-  // eerste versie eiste er twintig en liet daarmee precies de kleine
-  // installatiebedrijven vallen waar het om gaat.
-  const strongReputation =
-    rating !== null && ((reviewCount >= 20 && rating >= 4.0) || (reviewCount >= 8 && rating >= 4.2));
-
-  if (strongReputation && rating !== null && (noWebsite || lacks(signals, 'shows_reviews'))) {
-    found.push({
-      key: 'reputation_unused',
-      kind: 'asset',
-      title: `${reviewCount} klanten gaven u gemiddeld een ${formatRating(rating)}`,
-      body: noWebsite
-        ? 'Die waardering staat alleen op Google. Wie u opzoekt en twijfelt, vindt verder niets.'
-        : 'Sterk cijfer. Op uw eigen site komt het alleen nergens terug, juist waar iemand staat te twijfelen.',
-    });
-  }
-
-  const founded = signalValue(signals, 'founded_year');
-  const foundedValue = founded?.value as { year?: number; ageYears?: number } | undefined;
-  if (foundedValue?.year && (foundedValue.ageYears ?? 0) >= 10) {
-    found.push({
-      key: 'long_established',
-      kind: 'asset',
-      title: `U bestaat al ${foundedValue.ageYears} jaar`,
-      body: 'Dat is een voorsprong die online nauwelijks te zien is, terwijl nieuwe klanten daar juist op letten.',
-    });
-  }
-
-  return found;
-}
-
-/** Wat er ontbreekt. Dit staat nooit alleen op een flyer. */
-function gaps(signals: Signal[]): Observation[] {
-  const found: Observation[] = [];
-
-  if (lacks(signals, 'no_website_listed')) {
-    found.push({
-      key: 'no_website_listed',
-      kind: 'gap',
-      title: 'Bij Google staat geen website bij uw bedrijf',
-      body: 'Er is geen plek om iemand naartoe te sturen die meer wil weten.',
-    });
-  }
-
   if (lacks(signals, 'has_request_form')) {
     found.push({
-      key: 'has_request_form',
-      kind: 'gap',
-      title: 'Wij vonden geen aanvraagformulier op uw site',
-      body: "Wie 's avonds iets wil laten uitzoeken, kan alleen wachten tot er iemand opneemt.",
+      key: 'aanvragen',
+      theme: 'slimmer_werken',
+      title: 'Aanvragen slimmer binnenkrijgen en verwerken',
+      body: 'Hier lijkt mogelijk winst te behalen in het eenvoudiger verzamelen en opvolgen van aanvragen, ook buiten werktijd.',
+      groundedIn: 'Op de website vonden we geen plek om een aanvraag achter te laten.',
+    });
+  }
+
+  if (noWebsite) {
+    found.push({
+      key: 'vindbaarheid',
+      theme: 'meer_klanten',
+      title: 'Beter vindbaar voor wie jullie zoekt',
+      body: 'Wie jullie opzoekt komt nu vooral bij het adres en telefoonnummer uit. Daar valt mogelijk meer uit te halen.',
+      groundedIn: 'Bij Google staat geen website bij dit bedrijf.',
+    });
+  } else if (lacks(signals, 'shows_reviews') && reviewCount >= 8 && rating !== null && rating >= 4) {
+    found.push({
+      key: 'reputatie',
+      theme: 'meer_klanten',
+      title: 'Meer halen uit jullie goede naam',
+      body: 'Die waardering kan mogelijk sterker meewerken op de plek waar iemand staat te twijfelen.',
+      groundedIn: `${reviewCount} klanten gaven gemiddeld een ${formatRating(rating)} op Google.`,
     });
   }
 
   if (lacks(signals, 'mobile_friendly')) {
     found.push({
-      key: 'mobile_friendly',
-      kind: 'gap',
-      title: 'Op een telefoon schaalt de site niet mee',
-      body: 'Terwijl de meeste bezoekers juist op een klein scherm kijken.',
+      key: 'mobiel',
+      theme: 'betere_dienstverlening',
+      title: 'Beter werken op een telefoon',
+      body: 'De meeste mensen kijken op een klein scherm. Daar lijkt de ervaring nog eenvoudiger te kunnen.',
+      groundedIn: 'De website is niet ingesteld op mobiele schermen.',
     });
   }
 
   if (lacks(signals, 'https')) {
     found.push({
-      key: 'https',
-      kind: 'gap',
-      title: 'De site gebruikt nog geen beveiligde verbinding',
-      body: 'Browsers waarschuwen bezoekers daar tegenwoordig zichtbaar voor.',
+      key: 'beveiliging',
+      theme: 'betere_dienstverlening',
+      title: 'Vertrouwd overkomen bij bezoekers',
+      body: 'Browsers laten tegenwoordig zien of een verbinding beveiligd is. Dat is meestal snel geregeld.',
+      groundedIn: 'De website gebruikt nog geen beveiligde verbinding.',
     });
   }
 
   return found;
 }
 
-/** Bezit eerst, dan het gemis. Maximaal drie. */
+/**
+ * Afsluitende suggestie zonder eigen waarneming. Mag alleen mee als er al twee
+ * onderbouwde kansen staan — anders zou een flyer volledig op een aanname rusten.
+ */
+const AI_SUGGESTION: Observation = {
+  key: 'ai_praktisch',
+  theme: 'klaar_voor_ai',
+  title: 'Praktisch starten met AI',
+  body: 'Terugkerend administratief werk kan tegenwoordig vaak gedeeltelijk slimmer. Klein beginnen, kijken wat het oplevert.',
+  groundedIn: null,
+};
+
 export function observationsForFlyer(signals: Signal[], place: PlaceSummary): Observation[] {
-  // Was de site onbereikbaar, dan weten we van de rest niets. Een flyer die
-  // beweert dat iemands website plat lag terwijl het een storing van vijf
-  // minuten was, is precies de fout die we niet willen maken.
+  // Was de site onbereikbaar, dan weten we van de rest niets.
   if (lacks(signals, 'site_reachable')) return [];
 
-  const owned = assets(signals, place);
-  const missing = gaps(signals);
+  const real = grounded(signals, place);
+  if (real.length < 2) return [];
 
-  if (owned.length === 0 || missing.length === 0) return [];
-
-  return [...owned.slice(0, 2), ...missing].slice(0, 3);
+  return real.length >= 3 ? real.slice(0, 3) : [...real, AI_SUGGESTION];
 }
 
 export function flyerReadiness(
@@ -171,40 +169,25 @@ export function flyerReadiness(
     return {
       ready: false,
       observations: [],
-      reason: 'De website was niet bereikbaar toen we keken; daar drukken we niets over.',
+      reason: 'De website was niet bereikbaar toen we keken; daar baseren we geen kansen op.',
     };
   }
 
-  const owned = assets(signals, place);
-  const missing = gaps(signals);
+  const real = grounded(signals, place);
 
-  // Eerst kijken of er iets te melden valt. Is de site op orde, dan is dat de
-  // nuttige uitkomst — niet "geen bezit gevonden", want dat klopt dan wel maar
-  // zegt niets.
-  if (missing.length === 0) {
+  if (real.length === 0) {
     return {
       ready: false,
       observations: [],
-      reason: 'Site is op orde — niets concreets om te benoemen. Gebruik de generieke flyer.',
+      reason: 'Niets concreets gevonden om een kans op te baseren. Gebruik de generieke flyer.',
     };
   }
 
-  if (owned.length === 0) {
-    const count = place.reviewCount ?? 0;
-    const rating = place.rating;
-    const reputation =
-      rating === null
-        ? 'geen rating'
-        : `${count} reviews met een ${rating.toFixed(1).replace('.', ',')}`;
-    const age = signalValue(signals, 'founded_year') ? '' : ', geen oprichtingsjaar op de site';
-
+  if (real.length === 1) {
     return {
       ready: false,
       observations: [],
-      reason:
-        `Wel gemissen gevonden, maar niets dat dit bedrijf al heeft opgebouwd ` +
-        `(${reputation}${age}). Een flyer die alleen opsomt wat er ontbreekt is kritiek ` +
-        `van een vreemde — gebruik de generieke.`,
+      reason: `Maar één kans gevonden ("${real[0].title}"). Te mager voor een eigen flyer; gebruik de generieke.`,
     };
   }
 

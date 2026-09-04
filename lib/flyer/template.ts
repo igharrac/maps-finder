@@ -85,88 +85,79 @@ function front(data: FlyerData): string {
   const items = data.observations
     .map(
       (o, i) => `
-      <div style="display:flex;gap:15px;">
-        <span style="flex-shrink:0;width:30px;font-family:'Instrument Serif',Georgia,serif;font-size:30px;line-height:1.05;color:${C.ochre};">0${i + 1}</span>
+      <div style="display:flex;gap:13px;">
+        <span style="flex-shrink:0;width:24px;font-family:'Instrument Serif',Georgia,serif;font-size:25px;line-height:1.1;color:${C.ochre};">${i + 1}</span>
         <div>
-          <div style="font-size:17.5px;font-weight:600;line-height:1.32;">${escapeHtml(o.title)}</div>
-          <div style="font-size:16px;line-height:1.5;color:${C.body};margin-top:4px;">${escapeHtml(o.body)}</div>
+          <div style="font-size:17px;font-weight:600;line-height:1.3;">${escapeHtml(o.title)}</div>
+          <div style="font-size:16px;line-height:1.42;color:${C.body};margin-top:2px;">${
+            // Eerst wat we zagen, dan pas wat er mogelijk is. Zo staat het feit
+            // vooraan en is meteen duidelijk waar de kans op rust.
+            o.groundedIn ? `<span style="color:${C.muted};">${escapeHtml(o.groundedIn)}</span> ` : ''
+          }${escapeHtml(o.body)}</div>
         </div>
       </div>`,
     )
     .join('');
 
   return `<div style="width:${TRIM_W}px;height:${TRIM_H}px;background:${C.paper};color:${C.ink};display:flex;flex-direction:column;overflow:hidden;">
-  <div style="flex-grow:1;padding:34px 44px 0;display:flex;flex-direction:column;">
-    <div style="font-size:13px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${C.ochre};">Voor de mensen van</div>
-    <div style="font-size:28px;font-weight:700;line-height:1.16;letter-spacing:-0.018em;margin-top:8px;">${escapeHtml(data.companyName)}</div>
-    <div style="width:66px;height:5px;background:${C.pine};margin-top:18px;"></div>
-    <div style="font-size:20px;font-weight:600;line-height:1.3;margin-top:18px;">${
-      data.observations.length === 1 ? 'Iets dat ons opviel' : `${data.observations.length === 2 ? 'Twee' : 'Drie'} dingen die ons opvielen`
-    }</div>
-    <div style="display:flex;flex-direction:column;gap:15px;margin-top:16px;">${items}</div>
+  <div style="flex-grow:1;padding:32px 44px 0;display:flex;flex-direction:column;">
+    <div style="font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-0.018em;max-width:430px;">Waar kan jullie bedrijf slimmer werken?</div>
+
+    <div style="font-size:16px;line-height:1.5;color:${C.body};margin-top:10px;max-width:440px;">
+      Veel bedrijven zien kansen in digitalisering, maar niet altijd waar te beginnen. We keken alvast even mee.
+    </div>
+
+    <div style="width:56px;height:4px;background:${C.pine};margin-top:15px;"></div>
+
+    <div style="font-size:19px;font-weight:600;line-height:1.32;margin-top:11px;">${
+      data.observations.length === 3 ? 'Drie kansen' : 'Twee kansen'
+    } die we voor ${escapeHtml(data.companyName)} zien</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">${items}</div>
+
     <div style="flex-grow:1;"></div>
-    <div style="display:flex;gap:13px;padding:15px 17px;background:${C.tint};border-radius:10px;margin-bottom:16px;">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="${C.pine}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01"></path></svg>
-      <div style="font-size:16px;line-height:1.5;">Dit zagen wij van buitenaf, in tien minuten. Misschien zitten we ernaast &mdash; daarom kost het eerste gesprek niets.</div>
+
+    <div style="font-size:14px;line-height:1.45;color:${C.muted};margin-bottom:10px;">
+      Dit zagen we van buitenaf. Wat er werkelijk speelt weten jullie zelf het beste.
     </div>
   </div>
-  <div style="flex-shrink:0;background:${C.pine};color:#FFFFFF;padding:22px 44px 24px;">
-    <div style="display:flex;align-items:center;gap:24px;">
-      <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;">
-        <div style="width:88px;height:88px;border-radius:8px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;">${data.qrSvg}</div>
-      </div>
+
+  <div style="flex-shrink:0;background:${C.pine};color:#FFFFFF;padding:18px 44px 20px;">
+    <div style="display:flex;align-items:center;gap:20px;">
+      <div style="flex-shrink:0;width:78px;height:78px;border-radius:8px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;">${data.qrSvg}</div>
       <div style="flex-grow:1;">
-        <div style="font-size:20px;font-weight:600;line-height:1.3;">Scan voor wat wij zouden aanpakken</div>
-        <div style="font-size:14.5px;opacity:0.82;margin-top:6px;">${escapeHtml(data.scanUrl.replace(/^https?:\/\//, ''))}</div>
-        <div style="font-size:25px;font-weight:700;letter-spacing:-0.01em;margin-top:12px;">${escapeHtml(data.sender.phone)}</div>
+        <div style="font-size:19px;font-weight:600;line-height:1.3;">Benieuwd wat er voor jullie mogelijk is?</div>
+        <div style="font-size:15px;line-height:1.45;opacity:0.86;margin-top:4px;">We denken graag 30 minuten vrijblijvend mee.</div>
+        <div style="font-size:24px;font-weight:700;letter-spacing:-0.01em;margin-top:10px;">${escapeHtml(data.sender.phone)}</div>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.22);font-size:15px;">
+
+    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.22);font-size:14.5px;">
       <span style="font-weight:600;">${escapeHtml(data.sender.name)}</span>
       <span style="opacity:0.5;">&middot;</span>
-      <span style="opacity:0.84;">${escapeHtml(data.sender.email)}</span>
+      <span style="opacity:0.84;">${escapeHtml(data.sender.website)}</span>
+      <span style="margin-left:auto;opacity:0.84;">${escapeHtml(data.sender.email)}</span>
     </div>
   </div>
 </div>`;
 }
 
 function back(sender: Sender): string {
-  const steps = [
-    ['Een half uur', 'Bij u op locatie, u vertelt waar het schuurt.'],
-    ['Kort voorstel', 'Eén pagina, vaste prijs.'],
-    ['Werkend opgeleverd', 'In weken, niet in maanden.'],
+  const benefits = [
+    ['Minder handmatig werk', 'Terugkerende taken en administratie eenvoudiger inrichten.'],
+    ['Meer inzicht in je bedrijf', 'Klanten, omzet en processen overzichtelijk bij elkaar.'],
+    ['Slimmer omgaan met klantvragen', 'Aanvragen sneller binnenkrijgen en opvolgen.'],
+    ['Een betere online klantreis', 'Van website tot offerte eenvoudiger en duidelijker.'],
+    ['Systemen beter laten samenwerken', 'Minder dubbel invoeren, informatie loopt door.'],
+    ['Praktisch starten met AI', 'Klein beginnen, kijken wat het echt oplevert.'],
   ]
     .map(
-      ([title, body], i) => `
-      <div>
-        <div style="width:26px;height:26px;border-radius:50%;background:${C.pine};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">${i + 1}</div>
-        <div style="font-size:15px;font-weight:600;margin-top:10px;line-height:1.3;">${title}</div>
-        <div style="font-size:15px;line-height:1.45;color:${C.muted};margin-top:4px;">${body}</div>
-      </div>`,
-    )
-    .join('');
-
-  const items = [
-    [
-      'De offerte gaat via de telefoon',
-      'Aanvragen komen binnen als telefoontje of los mailtje. Wie op locatie staat, kan niet opnemen.',
-    ],
-    [
-      'De website staat er wel, maar vraagt niets',
-      'Geen aanvraagformulier, geen manier om iets in gang te zetten. En op een telefoon nauwelijks te lezen.',
-    ],
-    [
-      'Goede reviews die niemand ziet',
-      'Jaren aan tevreden klanten op Google, en nergens te vinden waar een nieuwe klant staat te twijfelen.',
-    ],
-  ]
-    .map(
-      ([title, body], i) => `
-      <div style="display:flex;gap:18px;">
-        <span style="flex-shrink:0;width:40px;font-family:'Instrument Serif',Georgia,serif;font-size:34px;line-height:1;color:${C.ochre};">0${i + 1}</span>
+      ([title, body]) => `
+      <div style="display:flex;gap:11px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="${C.pine}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="m5 13 4 4L19 7"></path></svg>
         <div>
-          <div style="font-size:18.5px;font-weight:600;line-height:1.3;">${title}</div>
-          <div style="font-size:16px;line-height:1.5;color:${C.body};margin-top:5px;">${body}</div>
+          <div style="font-size:16px;font-weight:600;line-height:1.3;">${title}</div>
+          <div style="font-size:14.5px;line-height:1.45;color:${C.muted};margin-top:2px;">${body}</div>
         </div>
       </div>`,
     )
@@ -174,25 +165,49 @@ function back(sender: Sender): string {
 
   return `<div style="width:${TRIM_W}px;height:${TRIM_H}px;background:${C.paper};color:${C.ink};display:flex;flex-direction:column;overflow:hidden;">
   <div style="flex-grow:1;padding:40px 44px 0;display:flex;flex-direction:column;">
-    <div style="font-size:30px;font-weight:700;line-height:1.15;letter-spacing:-0.015em;">Wat wij vaak tegenkomen</div>
-    <div style="font-size:16px;line-height:1.5;color:${C.muted};margin-top:10px;">Drie dingen die bij bijna elk goedlopend bedrijf spelen.</div>
-    <div style="display:flex;flex-direction:column;gap:15px;margin-top:22px;">${items}</div>
-    <div style="height:1px;background:${C.line};margin:20px 0 18px;"></div>
-    <div style="font-size:20px;font-weight:700;letter-spacing:-0.01em;">Zo werkt het</div>
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:14px;">${steps}</div>
+    <div style="font-size:28px;font-weight:700;line-height:1.18;letter-spacing:-0.015em;">Wat kunnen we voor je doen?</div>
+    <div style="font-size:16px;line-height:1.55;color:${C.body};margin-top:10px;max-width:450px;">
+      We kijken praktisch met je mee naar processen, klanten, data en systemen, en laten zien waar verbetering mogelijk is. Zonder dat je zelf technisch hoeft te zijn.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 22px;margin-top:24px;">${benefits}</div>
+
+    <div style="height:1px;background:${C.line};margin:24px 0 20px;"></div>
+
+    <div style="font-size:19px;font-weight:700;letter-spacing:-0.01em;">Hoe dat gaat</div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:14px;">
+      <div>
+        <div style="width:25px;height:25px;border-radius:50%;background:${C.pine};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">1</div>
+        <div style="font-size:15px;font-weight:600;margin-top:9px;line-height:1.3;">Een half uur</div>
+        <div style="font-size:14.5px;line-height:1.45;color:${C.muted};margin-top:3px;">Vrijblijvend, bij jullie op locatie.</div>
+      </div>
+      <div>
+        <div style="width:25px;height:25px;border-radius:50%;background:${C.pine};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">2</div>
+        <div style="font-size:15px;font-weight:600;margin-top:9px;line-height:1.3;">Wat we zien</div>
+        <div style="font-size:14.5px;line-height:1.45;color:${C.muted};margin-top:3px;">Eén pagina, in gewone taal.</div>
+      </div>
+      <div>
+        <div style="width:25px;height:25px;border-radius:50%;background:${C.pine};color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;">3</div>
+        <div style="font-size:15px;font-weight:600;margin-top:9px;line-height:1.3;">Jullie beslissen</div>
+        <div style="font-size:14.5px;line-height:1.45;color:${C.muted};margin-top:3px;">Klein starten mag altijd.</div>
+      </div>
+    </div>
+
     <div style="flex-grow:1;"></div>
-    <div style="display:flex;gap:13px;padding:16px 18px;background:${C.tint};border-radius:10px;margin-bottom:20px;">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="${C.pine}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M21 12a8 8 0 0 1-11.4 7.2L4 20.5l1.4-5A8 8 0 1 1 21 12Z"></path></svg>
-      <div style="font-size:16px;line-height:1.5;"><span style="font-weight:600;">Valt er bij u weinig te halen?</span> Dan zeggen wij dat gewoon.</div>
+
+    <div style="font-size:13px;line-height:1.5;color:${C.muted};margin-bottom:18px;">
+      <span style="font-weight:600;color:${C.body};">Onze expertise:</span>
+      Design &middot; Development &middot; Data &amp; BI &middot; Informatieanalyse &middot; AI &amp; Automation
     </div>
   </div>
+
   <div style="flex-shrink:0;background:${C.pine};color:#fff;padding:18px 44px;display:flex;align-items:center;gap:14px;">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
+    <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 21s7-5.5 7-11a7 7 0 1 0-14 0c0 5.5 7 11 7 11Z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
     <div style="flex-grow:1;">
       <div style="font-size:16px;font-weight:600;">${escapeHtml(sender.name)}</div>
       <div style="font-size:14.5px;opacity:0.84;margin-top:2px;">${escapeHtml(sender.website)} &middot; ${escapeHtml(sender.email)}</div>
     </div>
-    <div style="flex-shrink:0;font-size:21px;font-weight:700;">${escapeHtml(sender.phone)}</div>
+    <div style="flex-shrink:0;font-size:20px;font-weight:700;">${escapeHtml(sender.phone)}</div>
   </div>
 </div>`;
 }
