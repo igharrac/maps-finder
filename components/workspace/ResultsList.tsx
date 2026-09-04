@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 import { groupLabels } from '@/lib/categories';
+import { PAND_FUNCTIE_LABEL } from '@/lib/locations/bag';
 
 import {
   foundedInfo,
@@ -237,6 +238,28 @@ export function ResultsList({
                       {label}
                     </span>
                   ))}
+                  {result.location && result.location.functie !== 'onbekend' ? (
+                    <span
+                      className={
+                        result.location.functie === 'bedrijfspand'
+                          ? 'rounded border border-[#DCE6E1] bg-accent-tint px-1.5 py-0.5 text-[10px] font-medium text-accent'
+                          : result.location.functie === 'woonadres'
+                            ? 'rounded border border-line bg-ochre-tint px-1.5 py-0.5 text-[10px] font-medium text-ochre-ink'
+                            : 'rounded border border-line bg-surface px-1.5 py-0.5 text-[10px] text-ink-2'
+                      }
+                      title={[
+                        `Gebruiksdoel volgens de BAG: ${result.location.gebruiksdoelen.join(', ')}`,
+                        result.location.bagAdres ? `Pand: ${result.location.bagAdres}` : null,
+                        result.location.oppervlakte
+                          ? `Oppervlakte: ${result.location.oppervlakte} m²`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join('\n')}
+                    >
+                      {PAND_FUNCTIE_LABEL[result.location.functie]}
+                    </span>
+                  ) : null}
                   {(() => {
                     const founded = foundedInfo(result.score.signals);
                     if (!founded) return null;

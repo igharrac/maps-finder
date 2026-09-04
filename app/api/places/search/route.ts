@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { lookupPanden, PAND_FUNCTIE_LABEL } from '@/lib/locations/bag';
 import { PlacesError, searchGroups } from '@/lib/places/client';
 import { scorePlace } from '@/lib/scoring';
+import type { Signal } from '@/lib/scoring/signals';
 import { createClient } from '@/lib/supabase/server';
 import { markerStyleFor, type ProspectStatus } from '@/lib/types';
 
@@ -92,9 +94,44 @@ export async function POST(request: Request) {
       (known ?? []).map((row) => [row.google_place_id, row] as const),
     );
 
+    // Wat voor pand staat er op dit adres? Dit komt uit de BAG en is gratis,
+    // dus het gebeurt voor elk resultaat en niet pas op verzoek. Het gaat
+    // buiten het Places-budget om en houdt de zoekactie hooguit een seconde
+    // op; wat niet lukt komt terug als 'onbekend'.
+    const panden = await lookupPanden(
+      places.map((p) => ({ placeId: p.placeId, lat: p.lat, lng: p.lng, address: p.address })),
+    );
+
     const results = places.map((place) => {
       const existing = byPlaceId.get(place.placeId);
-      const score = scorePlace(place);
+      const location = panden.get(place.placeId) ?? null;
+
+      // De pandfunctie is een feit, maar telt bewust niet mee in de score: een
+      // bedrijf aan huis is niet minder waard, het past alleen niet bij deze
+      // manier van acquisitie. Vandaar normalized: null.
+      const extra: Signal[] =
+        location && location.functie !== 'onbekend'
+          ? [
+              {
+                key: 'pand_functie',
+                kind: 'fact',
+                label: location.bagAdres
+                  ? `${PAND_FUNCTIE_LABEL[location.functie]} — ${location.bagAdres}`
+                  : PAND_FUNCTIE_LABEL[location.functie],
+                value: {
+                  functie: location.functie,
+                  gebruiksdoelen: location.gebruiksdoelen,
+                  oppervlakte: location.oppervlakte,
+                  bagAdres: location.bagAdres,
+                },
+                normalized: null,
+                confidence: 0.9,
+                detectedBy: 'bag',
+              },
+            ]
+          : [];
+
+      const score = scorePlace(place, undefined, extra);
       const status = (existing?.status ?? 'discovered') as ProspectStatus;
 
       return {
@@ -103,6 +140,7 @@ export async function POST(request: Request) {
         markerStyle: markerStyleFor(status, score),
         place,
         score,
+        location,
         distanceMeters: distanceMeters({ lat, lng }, place),
       };
     });

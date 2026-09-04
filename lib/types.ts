@@ -1,3 +1,4 @@
+import type { LocationContext } from '@/lib/locations/bag';
 import type { PlaceSummary } from '@/lib/places/types';
 import type { ScoreBreakdown } from '@/lib/scoring';
 
@@ -95,6 +96,8 @@ export type ProspectView = {
   status: ProspectStatus;
   place: PlaceSummary;
   score: ScoreBreakdown;
+  /** Wat voor pand dit is volgens de BAG. Null als de BAG niets wist. */
+  location: LocationContext | null;
   /** Afstand tot het zoekmiddelpunt in meters. */
   distanceMeters: number | null;
 };
@@ -106,6 +109,8 @@ export type SearchResult = {
   markerStyle: MarkerStyleKey;
   place: PlaceSummary;
   score: ScoreBreakdown;
+  /** Wat voor pand dit is volgens de BAG. Null als de BAG niets wist. */
+  location: LocationContext | null;
   distanceMeters: number;
 };
 

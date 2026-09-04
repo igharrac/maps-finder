@@ -19,6 +19,13 @@ export type Filters = {
    * Meerdere aangevinkt betekent OF, niet EN.
    */
   markerStyles: MarkerStyleKey[];
+  /**
+   * Verbergt bedrijven die volgens de BAG op een adres met uitsluitend
+   * woonfunctie staan — het bedrijf aan de keukentafel. Panden met een
+   * gemengde functie blijven staan: daar zit vaak een werkplaats of winkel
+   * onder de woning.
+   */
+  hideWoonadres: boolean;
   hideDelivered: boolean;
   showRejected: boolean;
 };
@@ -29,6 +36,7 @@ export const DEFAULT_FILTERS: Filters = {
   minRating: 0,
   minReviews: 0,
   markerStyles: [],
+  hideWoonadres: true,
   hideDelivered: false,
   showRejected: false,
 };
@@ -177,6 +185,11 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
             />
           </div>
         </div>
+        <p className="-mt-1 text-[11px] leading-relaxed text-ink-3">
+          Reviewvolume is de enige maat voor drukte die Google meegeeft. Het is
+          een indicatie, geen bedrijfsgrootte: een groothandel met vaste
+          afnemers heeft er bijna geen en is toch groot.
+        </p>
 
         <div className="h-px bg-surface-2" />
 
@@ -219,6 +232,29 @@ export function FilterSidebar({ filters, counts, onChange }: Props) {
           <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
             Meerdere aanvinken toont alles wat in één van die categorieën valt.
             Niets aanvinken toont alles.
+          </p>
+        </fieldset>
+
+        <div className="h-px bg-surface-2" />
+
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-ink-3">
+            Soort locatie
+          </legend>
+          <label className="flex cursor-pointer items-center gap-2.5 text-xs">
+            <input
+              type="checkbox"
+              checked={filters.hideWoonadres}
+              onChange={(e) => onChange({ ...filters, hideWoonadres: e.target.checked })}
+              className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+            />
+            Verberg bedrijven op een woonadres
+          </label>
+          <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
+            Komt uit de BAG van het Kadaster: elk pand heeft daar een
+            gebruiksdoel. Alleen panden met uitsluitend woonfunctie vallen weg —
+            een winkel in een dorpskern of een woning met werkplaats blijft
+            staan. De BAG kan achterlopen, dus zet dit uit als je alles wilt zien.
           </p>
         </fieldset>
 

@@ -413,6 +413,10 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       if (r.score.opportunityScore < filters.minScore) return false;
       if (filters.minRating > 0 && (r.place.rating ?? 0) < filters.minRating) return false;
       if (filters.minReviews > 0 && (r.place.reviewCount ?? 0) < filters.minReviews) return false;
+      // Alleen een pand met uitsluitend woonfunctie valt af. Weet de BAG het
+      // niet, dan blijft het bedrijf staan — wegfilteren op onwetendheid is
+      // precies de fout die we bij de scoring ook gemaakt hebben.
+      if (filters.hideWoonadres && r.location?.functie === 'woonadres') return false;
       // OF binnen de categorieën: één treffer is genoeg.
       if (filters.markerStyles.length && !filters.markerStyles.includes(r.markerStyle))
         return false;
