@@ -32,9 +32,14 @@ type Props = {
   onToggleFlyer: (prospectId: string) => void;
 };
 
-function scoreClasses(score: number): string {
-  if (score >= 80) return 'bg-accent text-white';
-  if (score >= 65) return 'bg-ochre-tint text-ochre-ink';
+/**
+ * Een score op alleen Google-velden is een schatting en hoort er ook zo uit te
+ * zien. Pas na de website-analyse staat het cijfer ergens op.
+ */
+function scoreClasses(score: number, verified: boolean): string {
+  if (!verified) return 'border border-dashed border-line-strong bg-surface text-ink-3';
+  if (score >= 75) return 'bg-accent text-white';
+  if (score >= 60) return 'bg-ochre-tint text-ochre-ink';
   return 'bg-surface-2 text-ink-2';
 }
 
@@ -153,9 +158,15 @@ export function ResultsList({
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg font-display text-lg tabular ${scoreClasses(
                       result.score.opportunityScore,
+                      result.score.evidence === 'verified',
                     )}`}
-                    title={`Business Potential ${result.score.businessPotential} · Digital Maturity ${result.score.digitalMaturity}`}
+                    title={
+                      result.score.evidence === 'verified'
+                        ? `Business Potential ${result.score.businessPotential} · Digital Maturity ${result.score.digitalMaturity} · ${result.score.findingCount} bevindingen`
+                        : 'Schatting op alleen Google-gegevens. Analyseer de site voor een echt oordeel.'
+                    }
                   >
+                    {result.score.evidence === 'verified' ? '' : '~'}
                     {result.score.opportunityScore}
                   </span>
                 </div>
@@ -188,6 +199,32 @@ export function ResultsList({
 
                 {/* Signalen zijn belangrijker dan het cijfer: dit is wat je in een
                     gesprek gebruikt. */}
+                {result.score.evidence === 'verified' ? (
+                  <p className="mt-2 text-[11px] leading-snug text-ink-2">
+                    <span className="font-medium">
+                      {result.score.findingCount === 0
+                        ? 'Niets concreets gevonden'
+                        : `${result.score.findingCount} ${
+                            result.score.findingCount === 1 ? 'bevinding' : 'bevindingen'
+                          }`}
+                    </span>
+                    {result.score.findingCount > 0 ? (
+                      <>
+                        {' · '}
+                        {result.score.signals
+                          .filter((sig) => sig.kind === 'fact' && sig.normalized === 0)
+                          .slice(0, 2)
+                          .map((sig) => sig.label)
+                          .join(' · ')}
+                      </>
+                    ) : null}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-[11px] text-ink-3">
+                    Nog niet geanalyseerd — score is een schatting
+                  </p>
+                )}
+
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {groupLabels(result.place.groupIds).map((label) => (
                     <span

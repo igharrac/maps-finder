@@ -45,9 +45,21 @@ export type MarkerStyleKey =
   | 'flyer_delivered'
   | 'responded';
 
+/**
+ * Bepaalt de markervorm.
+ *
+ * Hoog potentieel wordt VERDIEND, niet berekend. Een bedrijf krijgt die status
+ * pas als we de site zelf bekeken hebben en er minstens twee concrete gemissen
+ * uit kwamen — dezelfde lat als voor het mogen drukken van een eigen flyer.
+ *
+ * Voorheen haalde een bedrijf zonder website met redelijke reviews al 80+ en
+ * kreeg het de groene ruit, terwijl er nog niets over te zeggen viel. De score
+ * leunde op de AFWEZIGHEID van gegevens en suggereerde daarmee zekerheid die er
+ * niet was. Zonder analyse is "interessant, nog uit te zoeken" het maximum.
+ */
 export function markerStyleFor(
   status: ProspectStatus,
-  opportunityScore: number | null,
+  score: { opportunityScore: number; evidence: 'unverified' | 'verified'; findingCount: number } | null,
 ): MarkerStyleKey {
   switch (status) {
     case 'high_potential':
@@ -62,16 +74,18 @@ export function markerStyleFor(
     case 'responded':
     case 'meeting':
       return 'responded';
-    case 'saved':
-    case 'analyzed':
-      return 'interesting';
     default:
-      return opportunityScore !== null && opportunityScore >= 80
-        ? 'high_potential'
-        : opportunityScore !== null && opportunityScore >= 65
-          ? 'interesting'
-          : 'new';
+      break;
   }
+
+  if (!score) return 'new';
+
+  const earned =
+    score.evidence === 'verified' && score.findingCount >= 2 && score.opportunityScore >= 75;
+
+  if (earned) return 'high_potential';
+  if (score.evidence === 'verified' || score.opportunityScore >= 65) return 'interesting';
+  return 'new';
 }
 
 /** Wat de workspace per bedrijf toont: brondata plus onze eigen kennis. */

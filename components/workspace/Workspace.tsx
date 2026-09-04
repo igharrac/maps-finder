@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { CATEGORY_GROUPS } from '@/lib/categories';
-import { MARKER_ORDER, type SearchResult, type SortId } from '@/lib/types';
+import { markerStyleFor, MARKER_ORDER, type SearchResult, type SortId } from '@/lib/types';
 import { DEFAULT_FILTERS, FilterSidebar, type Filters } from './FilterSidebar';
 import { ProspectMap } from './ProspectMap';
 import { ResultsList } from './ResultsList';
@@ -162,7 +162,12 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       setResults((current) =>
         current.map((r) =>
           r.place.placeId === result.place.placeId
-            ? { ...r, prospectId: data.prospectId, status: 'saved', markerStyle: 'interesting' }
+            ? {
+                ...r,
+                prospectId: data.prospectId,
+                status: 'saved',
+                markerStyle: markerStyleFor('saved', r.score),
+              }
             : r,
         ),
       );
@@ -196,7 +201,12 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
       setResults((current) =>
         current.map((r) =>
           r.place.placeId === result.place.placeId
-            ? { ...r, score: data.score, status: 'analyzed', markerStyle: 'interesting' }
+            ? {
+                ...r,
+                score: data.score,
+                status: 'analyzed',
+                markerStyle: markerStyleFor('analyzed', data.score),
+              }
             : r,
         ),
       );
@@ -230,7 +240,7 @@ export function Workspace({ userEmail, mapsApiKey, mapId, missingEnv }: Props) {
                 ...r,
                 prospectId: null,
                 status: 'discovered',
-                markerStyle: r.score.opportunityScore >= 80 ? 'high_potential' : r.score.opportunityScore >= 65 ? 'interesting' : 'new',
+                markerStyle: markerStyleFor('discovered', r.score),
               }
             : r,
         ),

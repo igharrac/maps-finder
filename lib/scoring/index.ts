@@ -9,6 +9,16 @@ export type ScoreBreakdown = {
   digitalMaturity: number;
   /** Hoe hard de score is. Laag zolang alleen Google-signalen beschikbaar zijn. */
   confidence: number;
+  /**
+   * unverified = alleen Google-velden gezien, verified = de site is bekeken.
+   * Zonder eigen waarneming is elke score een schatting.
+   */
+  evidence: 'unverified' | 'verified';
+  /**
+   * Aantal concrete gemissen dat we zelf hebben waargenomen. Dit is wat je in
+   * een gesprek kunt noemen; de score zelf zegt een ondernemer niets.
+   */
+  findingCount: number;
   signals: Signal[];
   weights: ScoringWeights;
 };
@@ -85,8 +95,15 @@ export function scorePlace(
       digitalGap * weights.opportunity.digitalGap,
   );
 
+  const probed = signals.filter((s) => s.detectedBy === 'website_probe');
+  const findingCount = probed.filter(
+    (s) => s.kind === 'fact' && s.normalized === 0 && s.confidence >= 0.6,
+  ).length;
+
   return {
     modelVersion: MODEL_VERSION,
+    evidence: probed.length > 0 ? 'verified' : 'unverified',
+    findingCount,
     opportunityScore,
     businessPotential,
     digitalMaturity,

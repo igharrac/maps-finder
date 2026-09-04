@@ -5,126 +5,153 @@ import type { Signal } from '@/lib/scoring/signals';
  * Zet gedetecteerde signalen om in regels die op een gedrukte flyer mogen.
  *
  * Dit is het gevoeligste stuk van de applicatie. Deze zinnen gaan gedrukt bij
- * iemand door de brievenbus, met zijn bedrijfsnaam erboven. Een fout feit kost
- * je dat bedrijf, en je hoort het pas als er geïrriteerd gebeld wordt.
+ * iemand door de brievenbus, met zijn bedrijfsnaam erboven.
  *
- * Daarom drie regels:
+ * Vier regels:
  *
  * 1. Alleen FEITEN. Gevolgtrekkingen en aanbevelingen komen er niet in.
- * 2. Alleen signalen waar we voldoende zeker van zijn. Een copyrightjaartal
- *    (zekerheid 0,55) zegt te weinig en valt af.
- * 3. Elke zin beschrijft wat WIJ hebben waargenomen, niet wat er waar is over
- *    het bedrijf. "Wij vonden geen aanvraagformulier" blijft kloppen ook als er
- *    er een achter JavaScript zit; "u heeft geen aanvraagformulier" niet.
+ * 2. Alleen signalen waar we voldoende zeker van zijn.
+ * 3. Elke zin beschrijft wat WIJ hebben waargenomen, niet wat waar is over het
+ *    bedrijf. "Wij vonden geen aanvraagformulier" blijft kloppen ook als er een
+ *    achter JavaScript zit; "u heeft geen aanvraagformulier" niet.
+ * 4. Er moet minstens één BEZIT in staan naast een GEMIS.
+ *
+ * Die vierde regel is de belangrijkste en kwam er later bij. Een flyer die
+ * alleen opsomt wat iemand mist, is een lijstje kritiek van een vreemde. Een
+ * flyer die begint bij wat hij heeft opgebouwd — jaren aan tevreden klanten,
+ * een reputatie, een lange staat van dienst — en pas dan laat zien waar dat
+ * blijft liggen, gaat over zijn bedrijf en niet over onze checklist. "U heeft
+ * geen website" is geen boodschap. "128 klanten gaven u een 4,6, en wie u
+ * opzoekt vindt alleen een telefoonnummer" wel.
  */
 
 const MIN_CONFIDENCE = 0.6;
 
-/** Minder dan dit aantal waarnemingen en we drukken geen flyer. */
-export const MIN_OBSERVATIONS = 2;
+/** Een waarneming is óf iets dat het bedrijf heeft, óf iets dat ontbreekt. */
+export type ObservationKind = 'asset' | 'gap';
 
 export type Observation = {
   key: string;
+  kind: ObservationKind;
   title: string;
   body: string;
 };
 
-type Builder = (signal: Signal, place: PlaceSummary) => Observation | null;
+function signalValue(signals: Signal[], key: string): Signal | undefined {
+  const signal = signals.find((s) => s.key === key);
+  if (!signal) return undefined;
+  if (signal.kind !== 'fact') return undefined;
+  if (signal.confidence < MIN_CONFIDENCE) return undefined;
+  return signal;
+}
+
+function lacks(signals: Signal[], key: string): boolean {
+  return signalValue(signals, key)?.normalized === 0;
+}
+
+function formatRating(rating: number): string {
+  return rating.toFixed(1).replace('.', ',');
+}
 
 /**
- * Alleen deze signalen mogen op een flyer, en alleen in hun negatieve vorm —
- * een gemis is iets om over te praten, "u heeft wel een formulier" niet.
+ * Wat het bedrijf heeft opgebouwd en nu niet benut. Hier begint de flyer, want
+ * dit is het deel dat de ondernemer herkent als van hem.
  */
-const BUILDERS: Record<string, Builder> = {
-  // Het sterkste dat je kunt aantreffen. Bewust geformuleerd als "bij Google
-  // staat er geen", want een bedrijf kan best een site hebben die alleen niet
-  // aan zijn Google-vermelding hangt — en dat is dan óók iets om te bespreken.
-  no_website_listed: () => ({
-    key: 'no_website_listed',
-    title: 'Bij Google staat geen website bij uw bedrijf',
-    body: 'Wie u opzoekt en wil vergelijken, vindt alleen een adres en een telefoonnummer.',
-  }),
+function assets(signals: Signal[], place: PlaceSummary): Observation[] {
+  const found: Observation[] = [];
 
-  has_request_form: (signal) =>
-    signal.normalized === 0
-      ? {
-          key: 'has_request_form',
-          title: 'Wij vonden geen aanvraagformulier op uw site',
-          body: "Wie 's avonds iets wil laten uitzoeken, kan alleen wachten tot er iemand opneemt.",
-        }
-      : null,
+  const reviewCount = place.reviewCount ?? 0;
+  const rating = place.rating;
+  const noWebsite = lacks(signals, 'no_website_listed') || !place.websiteUri;
 
-  mobile_friendly: (signal) =>
-    signal.normalized === 0
-      ? {
-          key: 'mobile_friendly',
-          title: 'Op een telefoon schaalt de site niet mee',
-          body: 'Terwijl de meeste bezoekers juist op een klein scherm kijken.',
-        }
-      : null,
+  // Een sterke reputatie die nergens werkt is de krachtigste opening die er is.
+  if (reviewCount >= 20 && rating !== null && rating >= 4 && (noWebsite || lacks(signals, 'shows_reviews'))) {
+    found.push({
+      key: 'reputation_unused',
+      kind: 'asset',
+      title: `${reviewCount} klanten gaven u gemiddeld een ${formatRating(rating)}`,
+      body: noWebsite
+        ? 'Die waardering staat alleen op Google. Wie u opzoekt en twijfelt, vindt verder niets.'
+        : 'Sterk cijfer. Op uw eigen site komt het alleen nergens terug, juist waar iemand staat te twijfelen.',
+    });
+  }
 
-  shows_reviews: (signal, place) => {
-    // Alleen interessant als er ook echt iets te laten zien is.
-    if (signal.normalized !== 0) return null;
-    const count = place.reviewCount ?? 0;
-    const rating = place.rating;
-    if (count < 20 || rating === null) return null;
+  const founded = signalValue(signals, 'founded_year');
+  const foundedValue = founded?.value as { year?: number; ageYears?: number } | undefined;
+  if (foundedValue?.year && (foundedValue.ageYears ?? 0) >= 15) {
+    found.push({
+      key: 'long_established',
+      kind: 'asset',
+      title: `U bestaat al ${foundedValue.ageYears} jaar`,
+      body: 'Dat is een voorsprong die online nauwelijks te zien is, terwijl nieuwe klanten daar juist op letten.',
+    });
+  }
 
-    return {
-      key: 'shows_reviews',
-      title: `${count} reviews op Google, gemiddeld een ${rating.toFixed(1).replace('.', ',')}`,
-      body: 'Dat is een sterk cijfer. Op uw eigen site komt het alleen nergens terug.',
-    };
-  },
+  return found;
+}
 
-  https: (signal) =>
-    signal.normalized === 0
-      ? {
-          key: 'https',
-          title: 'De site gebruikt nog geen beveiligde verbinding',
-          body: 'Browsers waarschuwen bezoekers daar tegenwoordig zichtbaar voor.',
-        }
-      : null,
-};
+/** Wat er ontbreekt. Dit staat nooit alleen op een flyer. */
+function gaps(signals: Signal[]): Observation[] {
+  const found: Observation[] = [];
 
-/** Volgorde waarin waarnemingen op de flyer komen; sterkste eerst. */
-const PRIORITY = ['no_website_listed', 'has_request_form', 'shows_reviews', 'mobile_friendly', 'https'];
+  if (lacks(signals, 'no_website_listed')) {
+    found.push({
+      key: 'no_website_listed',
+      kind: 'gap',
+      title: 'Bij Google staat geen website bij uw bedrijf',
+      body: 'Er is geen plek om iemand naartoe te sturen die meer wil weten.',
+    });
+  }
 
-export function observationsForFlyer(
-  signals: Signal[],
-  place: PlaceSummary,
-): Observation[] {
+  if (lacks(signals, 'has_request_form')) {
+    found.push({
+      key: 'has_request_form',
+      kind: 'gap',
+      title: 'Wij vonden geen aanvraagformulier op uw site',
+      body: "Wie 's avonds iets wil laten uitzoeken, kan alleen wachten tot er iemand opneemt.",
+    });
+  }
+
+  if (lacks(signals, 'mobile_friendly')) {
+    found.push({
+      key: 'mobile_friendly',
+      kind: 'gap',
+      title: 'Op een telefoon schaalt de site niet mee',
+      body: 'Terwijl de meeste bezoekers juist op een klein scherm kijken.',
+    });
+  }
+
+  if (lacks(signals, 'https')) {
+    found.push({
+      key: 'https',
+      kind: 'gap',
+      title: 'De site gebruikt nog geen beveiligde verbinding',
+      body: 'Browsers waarschuwen bezoekers daar tegenwoordig zichtbaar voor.',
+    });
+  }
+
+  return found;
+}
+
+/** Bezit eerst, dan het gemis. Maximaal drie. */
+export function observationsForFlyer(signals: Signal[], place: PlaceSummary): Observation[] {
   // Was de site onbereikbaar, dan weten we van de rest niets. Een flyer die
   // beweert dat iemands website plat lag terwijl het een storing van vijf
   // minuten was, is precies de fout die we niet willen maken.
-  const reachable = signals.find((s) => s.key === 'site_reachable');
-  if (reachable && reachable.normalized === 0) return [];
+  if (lacks(signals, 'site_reachable')) return [];
 
-  const found = new Map<string, Observation>();
+  const owned = assets(signals, place);
+  const missing = gaps(signals);
 
-  for (const signal of signals) {
-    if (signal.kind !== 'fact') continue;
-    if (signal.confidence < MIN_CONFIDENCE) continue;
+  if (owned.length === 0 || missing.length === 0) return [];
 
-    const build = BUILDERS[signal.key];
-    if (!build) continue;
-
-    const observation = build(signal, place);
-    if (observation) found.set(observation.key, observation);
-  }
-
-  return PRIORITY.map((key) => found.get(key))
-    .filter((o): o is Observation => o !== undefined)
-    .slice(0, 3);
+  return [...owned.slice(0, 2), ...missing].slice(0, 3);
 }
 
-/** Kan er een gepersonaliseerde flyer gemaakt worden, en zo nee waarom niet. */
 export function flyerReadiness(
   signals: Signal[],
   place: PlaceSummary,
 ): { ready: boolean; observations: Observation[]; reason?: string } {
-  // Zonder website-analyse hebben we alleen Google-velden, en daar staat niets
-  // in dat op een flyer thuishoort.
   const analyzed = signals.some((s) => s.detectedBy === 'website_probe');
   if (!analyzed) {
     return {
@@ -134,8 +161,7 @@ export function flyerReadiness(
     };
   }
 
-  const unreachable = signals.find((s) => s.key === 'site_reachable' && s.normalized === 0);
-  if (unreachable) {
+  if (lacks(signals, 'site_reachable')) {
     return {
       ready: false,
       observations: [],
@@ -143,23 +169,29 @@ export function flyerReadiness(
     };
   }
 
-  const observations = observationsForFlyer(signals, place);
+  const owned = assets(signals, place);
+  const missing = gaps(signals);
 
-  // Eén bevinding is normaal te mager, maar "geen website" is op zichzelf al
-  // een heel gesprek waard. Dan volstaat die ene.
-  const onlyNoWebsite =
-    observations.length === 1 && observations[0].key === 'no_website_listed';
-
-  if (observations.length < MIN_OBSERVATIONS && !onlyNoWebsite) {
+  // Eerst kijken of er iets te melden valt. Is de site op orde, dan is dat de
+  // nuttige uitkomst — niet "geen bezit gevonden", want dat klopt dan wel maar
+  // zegt niets.
+  if (missing.length === 0) {
     return {
       ready: false,
-      observations,
-      reason:
-        observations.length === 0
-          ? 'Site is op orde — niets concreets om te benoemen. Gebruik de generieke flyer.'
-          : `Maar één bevinding ("${observations[0].title}"); te mager voor een eigen flyer.`,
+      observations: [],
+      reason: 'Site is op orde — niets concreets om te benoemen. Gebruik de generieke flyer.',
     };
   }
 
-  return { ready: true, observations };
+  if (owned.length === 0) {
+    return {
+      ready: false,
+      observations: [],
+      reason:
+        'Wel gemissen gevonden, maar niets dat dit bedrijf al heeft opgebouwd. Een flyer ' +
+        'die alleen opsomt wat er ontbreekt is kritiek van een vreemde — gebruik de generieke.',
+    };
+  }
+
+  return { ready: true, observations: observationsForFlyer(signals, place) };
 }

@@ -228,6 +228,27 @@ export function ProspectMap({
     };
   }, [ready, results, onSelect, buildContent]);
 
+  // --- kaart meeschuiven naar de selectie ----------------------------------
+  //
+  // Andersom werkte al: een marker aanklikken schuift de lijst mee. Maar een
+  // rij aanklikken lichtte alleen een marker op die je misschien niet eens in
+  // beeld had. De kaart centreert nu op de selectie als die buiten beeld valt.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || !selectedPlaceId) return;
+
+    const result = results.find((r) => r.place.placeId === selectedPlaceId);
+    if (!result) return;
+
+    const position = { lat: result.place.lat, lng: result.place.lng };
+    const bounds = map.getBounds();
+
+    // Alleen verspringen als het nodig is; anders schokt de kaart bij elke klik.
+    if (!bounds || !bounds.contains(position)) {
+      map.panTo(position);
+    }
+  }, [ready, selectedPlaceId, results]);
+
   // --- selectie en hover benadrukken ---------------------------------------
   useEffect(() => {
     if (!ready) return;
@@ -274,6 +295,16 @@ export function ProspectMap({
         </div>
       ) : null}
 
+      {(() => {
+        const selected = results.find((r) => r.place.placeId === selectedPlaceId);
+        if (!selected || tooltip) return null;
+        return (
+          <div className="pointer-events-none absolute left-1/2 top-16 z-10 -translate-x-1/2 rounded-full border border-line bg-surface px-3 py-1.5 shadow-md">
+            <p className="text-[12px] font-semibold">{selected.place.name}</p>
+          </div>
+        );
+      })()}
+
       {tooltip ? (
         <div
           role="tooltip"
@@ -292,11 +323,24 @@ export function ProspectMap({
             </div>
             <span
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg font-display text-base tabular"
-              style={{
-                background: MARKER_APPEARANCE[tooltip.result.markerStyle].color,
-                color: '#fff',
-              }}
+              style={
+                tooltip.result.score.evidence === 'verified'
+                  ? {
+                      background: MARKER_APPEARANCE[tooltip.result.markerStyle].color,
+                      color: '#fff',
+                    }
+                  : {
+                      border: '1px dashed var(--color-line-strong)',
+                      color: 'var(--color-ink-3)',
+                    }
+              }
+              title={
+                tooltip.result.score.evidence === 'verified'
+                  ? undefined
+                  : 'Schatting op alleen Google-gegevens'
+              }
             >
+              {tooltip.result.score.evidence === 'verified' ? '' : '~'}
               {tooltip.result.score.opportunityScore}
             </span>
           </div>
@@ -327,10 +371,10 @@ export function ProspectMap({
             })()}
           </div>
 
-          {tooltip.result.score.signals.filter((s) => s.kind === 'fact').length ? (
+          {tooltip.result.score.evidence === 'verified' ? (
             <ul className="mt-2 flex flex-col gap-1 border-t border-surface-2 pt-2">
               {tooltip.result.score.signals
-                .filter((s) => s.kind === 'fact' && s.key !== 'founded_year')
+                .filter((s) => s.kind === 'fact' && s.normalized === 0 && s.key !== 'founded_year')
                 .slice(0, 3)
                 .map((signal) => (
                   <li key={signal.key} className="text-[11px] leading-snug text-ink-2">
@@ -338,7 +382,11 @@ export function ProspectMap({
                   </li>
                 ))}
             </ul>
-          ) : null}
+          ) : (
+            <p className="mt-2 border-t border-surface-2 pt-2 text-[11px] leading-snug text-ink-3">
+              Nog niet geanalyseerd — er valt nog niets concreets over te zeggen.
+            </p>
+          )}
         </div>
       ) : null}
 

@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       return {
         prospectId: existing?.id ?? null,
         status,
-        markerStyle: markerStyleFor(status, score.opportunityScore),
+        markerStyle: markerStyleFor(status, score),
         place,
         score,
         distanceMeters: distanceMeters({ lat, lng }, place),
