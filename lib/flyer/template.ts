@@ -101,19 +101,21 @@ function front(data: FlyerData): string {
 
   return `<div style="width:${TRIM_W}px;height:${TRIM_H}px;background:${C.paper};color:${C.ink};display:flex;flex-direction:column;overflow:hidden;">
   <div style="flex-grow:1;padding:32px 44px 0;display:flex;flex-direction:column;">
-    <div style="font-size:28px;font-weight:700;line-height:1.2;letter-spacing:-0.018em;max-width:430px;">Waar kan jullie bedrijf slimmer werken?</div>
+    <div style="font-size:13px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:${C.ochre};">Voor de mensen van</div>
 
-    <div style="font-size:16px;line-height:1.5;color:${C.body};margin-top:10px;max-width:440px;">
-      Veel bedrijven zien kansen in digitalisering, maar niet altijd waar te beginnen. We keken alvast even mee.
+    <div style="font-size:26px;font-weight:700;line-height:1.16;letter-spacing:-0.018em;margin-top:6px;">${escapeHtml(data.companyName)}</div>
+
+    <div style="width:56px;height:4px;background:${C.pine};margin-top:16px;"></div>
+
+    <div style="font-size:20px;font-weight:600;line-height:1.32;margin-top:16px;max-width:450px;">Waar kan het slimmer, eenvoudiger of makkelijker? ${
+      data.observations.length === 3 ? 'Drie kansen' : 'Twee kansen'
+    } die we zien.</div>
+
+    <div style="font-size:16px;line-height:1.5;color:${C.body};margin-top:8px;max-width:445px;">
+      We keken even mee met wat er van buitenaf te zien is.
     </div>
 
-    <div style="width:56px;height:4px;background:${C.pine};margin-top:15px;"></div>
-
-    <div style="font-size:19px;font-weight:600;line-height:1.32;margin-top:11px;">${
-      data.observations.length === 3 ? 'Drie kansen' : 'Twee kansen'
-    } die we voor ${escapeHtml(data.companyName)} zien</div>
-
-    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">${items}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">${items}</div>
 
     <div style="flex-grow:1;"></div>
 
