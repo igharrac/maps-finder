@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 
 import { groupLabels } from '@/lib/categories';
+import { contactsFromSignals } from '@/lib/enrichment/contacts';
 import { PAND_FUNCTIE_LABEL } from '@/lib/locations/bag';
 
 import {
@@ -285,7 +286,11 @@ export function ResultsList({
                     );
                   })()}
                   {result.score.signals
-                    .filter((s) => s.kind === 'fact' && s.key !== 'founded_year')
+                    .filter(
+                      (s) =>
+                        s.kind === 'fact' &&
+                        !['founded_year', 'contact_details', 'pand_functie'].includes(s.key),
+                    )
                     .slice(0, 2)
                     .map((signal) => (
                       <span
@@ -297,6 +302,77 @@ export function ResultsList({
                     ))}
                 </div>
               </button>
+
+              {(() => {
+                const contact = contactsFromSignals(result.score.signals);
+                if (!contact) return null;
+                const heeftIets =
+                  contact.telefoons.length > 0 ||
+                  contact.emails.length > 0 ||
+                  contact.contactpagina;
+                if (!heeftIets) return null;
+
+                return (
+                  <div className="mt-2 flex flex-col gap-1 rounded-md bg-surface-2 px-2 py-1.5 text-[11px]">
+                    {contact.telefoons[0] ? (
+                      <a
+                        href={`tel:${contact.telefoons[0]}`}
+                        className="flex items-center gap-1.5 text-ink-2 hover:text-accent"
+                        title={
+                          contact.telefoons.length > 1
+                            ? `Ook gevonden: ${contact.telefoons.slice(1).join(', ')}`
+                            : 'Op de website gevonden'
+                        }
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />
+                        </svg>
+                        <span className="tabular">{contact.telefoons[0]}</span>
+                      </a>
+                    ) : null}
+
+                    {contact.emails.map((mail) => (
+                      <a
+                        key={mail.adres}
+                        href={`mailto:${mail.adres}`}
+                        className="flex items-center gap-1.5 text-ink-2 hover:text-accent"
+                        title={
+                          mail.soort === 'persoonlijk'
+                            ? 'Adres van een persoon — persoonsgegeven onder de AVG. Ongevraagd mailen mag hier niet zomaar.'
+                            : 'Algemene postbus van het bedrijf'
+                        }
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="2" y="4" width="20" height="16" rx="2" />
+                          <path d="m2 7 10 6 10-6" />
+                        </svg>
+                        <span className="truncate">{mail.adres}</span>
+                        {mail.soort === 'persoonlijk' ? (
+                          <span className="shrink-0 rounded bg-ochre-tint px-1 text-[9px] font-medium text-ochre-ink">
+                            persoon
+                          </span>
+                        ) : null}
+                      </a>
+                    ))}
+
+                    {contact.emails.length === 0 && contact.contactpagina ? (
+                      <a
+                        href={contact.contactpagina}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 text-ink-2 hover:text-accent"
+                        title="Geen e-mailadres op de site, wel een contactformulier"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+                          <path d="M14 2v6h6M9 13h6M9 17h4" />
+                        </svg>
+                        Alleen een contactformulier
+                      </a>
+                    ) : null}
+                  </div>
+                );
+              })()}
 
               <div className="mt-2.5 flex flex-wrap gap-2">
                 {result.prospectId ? (

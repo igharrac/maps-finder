@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { contactSignals } from '@/lib/enrichment/contacts';
 import { detectSignals } from '@/lib/enrichment/detectors';
 import { FetchSiteError, fetchSite } from '@/lib/enrichment/fetchSite';
 import type { PlaceSummary } from '@/lib/places/types';
@@ -71,7 +72,9 @@ export async function POST(
   let signals;
   try {
     const page = await fetchSite(place.websiteUri);
-    signals = detectSignals(page);
+    // Contactgegevens komen uit dezelfde pagina die we toch al ophalen: geen
+    // extra verzoek naar de server van het bedrijf.
+    signals = [...detectSignals(page), ...contactSignals(page)];
   } catch (error) {
     if (error instanceof FetchSiteError) {
       // Cruciaal onderscheid. Een domein dat niet bestaat of een server die een
