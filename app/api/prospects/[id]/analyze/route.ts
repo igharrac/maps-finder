@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
+import { looksClientRendered } from '@/lib/enrichment/clientRendered';
 import { contactSignals } from '@/lib/enrichment/contacts';
 import { detectSignals } from '@/lib/enrichment/detectors';
 import { FetchSiteError, fetchSite } from '@/lib/enrichment/fetchSite';
+import { RenderSiteError, renderSite } from '@/lib/enrichment/renderSite';
 import type { PlaceSummary } from '@/lib/places/types';
 import { scorePlace } from '@/lib/scoring';
 import { createClient } from '@/lib/supabase/server';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /**
  * Analyseert de website van één prospect.
@@ -70,8 +72,64 @@ export async function POST(
   }
 
   let signals;
+  let warning: string | null = null;
+
   try {
-    const page = await fetchSite(place.websiteUri);
+    let page = await fetchSite(place.websiteUri);
+
+    // Veel moderne sites zetten hun inhoud pas met JavaScript neer. In de ruwe
+    // HTML staat dan een leeg <div> en verder niets. Zonder deze controle
+    // zouden we vastleggen dat er geen aanvraagformulier, geen reviews en geen
+    // telefoonnummer op de site staan — over een site die dat allemaal wél
+    // heeft. Dat is een onwaarheid die uiteindelijk op een gedrukte flyer
+    // belandt, dus liever een browser starten dan gokken.
+    if (looksClientRendered(page.html)) {
+      try {
+        page = await renderSite(page.url);
+      } catch (renderError) {
+        const reden =
+          renderError instanceof RenderSiteError && renderError.browserOntbreekt
+            ? 'er is geen browser beschikbaar om hem te tonen'
+            : 'hij liet zich ook met een browser niet uitlezen';
+
+        // Wat we zeker weten leggen we vast; over de rest zwijgen we liever dan
+        // dat we iets verzinnen.
+        const eerlijk = [
+          {
+            key: 'site_reachable',
+            kind: 'fact' as const,
+            label: 'Website is bereikbaar',
+            value: { status: page.status },
+            normalized: 1,
+            confidence: 1,
+            detectedBy: 'website_probe',
+          },
+          {
+            key: 'needs_javascript',
+            kind: 'fact' as const,
+            label: 'Site bouwt zijn inhoud op met JavaScript — niet uitgelezen',
+            value: { url: page.url, reden },
+            normalized: null,
+            confidence: 1,
+            detectedBy: 'website_probe',
+          },
+        ];
+
+        await persist(supabase, prospect.id, place, eerlijk);
+        return NextResponse.json({
+          warning:
+            `${place.name}: deze site laadt zijn inhoud met JavaScript en ${reden}. ` +
+            'Er is niets over de inhoud vastgelegd — beter niets dan iets verzonnens.',
+          signals: eerlijk,
+          score: scorePlace(place, undefined, eerlijk),
+        });
+      }
+
+      warning =
+        `${place.name}: deze site bouwt zijn inhoud met JavaScript op, ` +
+        'dus hij is met een browser opgehaald in plaats van als platte HTML.';
+    }
+
     // Contactgegevens komen uit dezelfde pagina die we toch al ophalen: geen
     // extra verzoek naar de server van het bedrijf.
     signals = [...detectSignals(page), ...contactSignals(page)];
@@ -113,7 +171,7 @@ export async function POST(
   }
 
   const score = await persist(supabase, prospect.id, place, signals);
-  return NextResponse.json({ signals, score });
+  return NextResponse.json(warning ? { warning, signals, score } : { signals, score });
 }
 
 async function persist(

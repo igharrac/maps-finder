@@ -80,10 +80,11 @@ check('rolpostbus staat vóór het persoonsadres', () => {
 
 console.log('\ntelefoon');
 
-check('vast nummer met streepjes', () =>
-  assert.equal(normaliseerTelefoon('075-612 84 20'), '0756128420'));
+check('vast nummer met streepjes wordt canoniek', () =>
+  assert.equal(normaliseerTelefoon('075-612 84 20'), '+31756128420'));
 
-check('mobiel nummer aaneen', () => assert.equal(normaliseerTelefoon('0612345678'), '0612345678'));
+check('mobiel nummer aaneen wordt canoniek', () =>
+  assert.equal(normaliseerTelefoon('0612345678'), '+31612345678'));
 
 check('internationaal met nul tussen haakjes', () =>
   assert.equal(normaliseerTelefoon('+31 (0)75 612 84 20'), '+31756128420'));
@@ -99,10 +100,23 @@ check('te lang nummer wordt geweigerd', () =>
   assert.equal(normaliseerTelefoon('012345678901234'), null));
 
 check('tel-link wordt gevonden', () =>
-  assert.deepEqual(extractTelefoons('<a href="tel:+31756128420">bel</a>'), ['+31756128420']));
+  assert.deepEqual(extractTelefoons('<a href="tel:+31756128420">bel</a>'), [
+    { canoniek: '+31756128420', weergave: '+31756128420' },
+  ]));
 
 check('nummer in lopende tekst wordt gevonden', () =>
-  assert.deepEqual(extractTelefoons('<p>Bel ons: 075 612 84 20</p>'), ['0756128420']));
+  assert.deepEqual(extractTelefoons('<p>Bel ons: 075 612 84 20</p>'), [
+    { canoniek: '+31756128420', weergave: '075 612 84 20' },
+  ]));
+
+check('link en tekst samen leveren ÉÉN nummer op, leesbaar genoteerd', () => {
+  const lijst = extractTelefoons(
+    '<a href="tel:+31850607813">085 060 7813</a>',
+  );
+  assert.equal(lijst.length, 1);
+  assert.equal(lijst[0].canoniek, '+31850607813');
+  assert.equal(lijst[0].weergave, '085 060 7813');
+});
 
 check('postcode en huisnummer leveren geen nummer op', () =>
   assert.deepEqual(extractTelefoons('<p>Industrieweg 12, 1521 NE Wormerveer</p>'), []));

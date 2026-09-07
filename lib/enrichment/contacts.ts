@@ -26,9 +26,16 @@ export type EmailAdres = {
   soort: 'rol' | 'persoonlijk';
 };
 
+export type Telefoon = {
+  /** Zoals het bedrijf het zelf opschrijft: "085 060 7813". */
+  weergave: string;
+  /** Eén vaste vorm om op te vergelijken: "+31850607813". */
+  canoniek: string;
+};
+
 export type ContactDetails = {
   emails: EmailAdres[];
-  telefoons: string[];
+  telefoons: Telefoon[];
   contactpagina: string | null;
   kvk: string | null;
   btw: string | null;
@@ -121,9 +128,14 @@ export function extractEmails(html: string): EmailAdres[] {
 }
 
 /**
- * Nederlandse telefoonnummers. Bewust smal: alleen wat begint met 0 of +31 en
- * op tien cijfers uitkomt. Anders vist het patroon jaartallen, KvK-nummers en
- * huisnummers op.
+ * Nederlandse telefoonnummers, teruggebracht tot één vaste vorm.
+ *
+ * Bewust smal: alleen wat begint met 0 of +31 en op tien cijfers uitkomt.
+ * Anders vist het patroon jaartallen, KvK-nummers en huisnummers op.
+ *
+ * Altijd +31, nooit 0. Hetzelfde nummer staat namelijk vaak twee keer op een
+ * pagina — als "085 060 7813" in de tekst en als tel:+31850607813 in de link —
+ * en zonder één vaste vorm komt het er twee keer uit.
  */
 export function normaliseerTelefoon(ruw: string): string | null {
   let cijfers = ruw.replace(/[^\d+]/g, '');
@@ -136,17 +148,31 @@ export function normaliseerTelefoon(ruw: string): string | null {
     return /^\d{9}$/.test(rest) ? `+31${rest}` : null;
   }
 
-  if (/^0\d{9}$/.test(cijfers)) return cijfers;
+  if (/^0\d{9}$/.test(cijfers)) return `+31${cijfers.slice(1)}`;
   return null;
 }
 
-export function extractTelefoons(html: string): string[] {
-  const gevonden = new Set<string>();
+export function extractTelefoons(html: string): Telefoon[] {
+  // Sleutel is de vaste vorm, waarde is hoe het bedrijf het zelf opschrijft.
+  // Die eigen notatie is prettiger te lezen dan +31850607813, dus die bewaren
+  // we — het groeperen van Nederlandse nummers is te onregelmatig om zelf te
+  // verzinnen.
+  const gevonden = new Map<string, string>();
 
-  for (const match of html.matchAll(TEL_PATROON)) {
-    const nummer = normaliseerTelefoon(match[1]);
-    if (nummer) gevonden.add(nummer);
+  function voegToe(ruw: string) {
+    const canoniek = normaliseerTelefoon(ruw);
+    if (!canoniek) return;
+
+    const weergave = ruw.trim().replace(/\s+/g, ' ');
+    const bestaand = gevonden.get(canoniek);
+    const leesbaar = (n: string) => /[\s-]/.test(n);
+
+    if (!bestaand || (!leesbaar(bestaand) && leesbaar(weergave))) {
+      gevonden.set(canoniek, weergave);
+    }
   }
+
+  for (const match of html.matchAll(TEL_PATROON)) voegToe(match[1]);
 
   const tekst = html.replace(/<[^>]+>/g, ' ');
   const patronen = [
@@ -155,13 +181,12 @@ export function extractTelefoons(html: string): string[] {
   ];
 
   for (const patroon of patronen) {
-    for (const match of tekst.matchAll(patroon)) {
-      const nummer = normaliseerTelefoon(match[0]);
-      if (nummer) gevonden.add(nummer);
-    }
+    for (const match of tekst.matchAll(patroon)) voegToe(match[0]);
   }
 
-  return [...gevonden].slice(0, 4);
+  return [...gevonden.entries()]
+    .slice(0, 4)
+    .map(([canoniek, weergave]) => ({ canoniek, weergave }));
 }
 
 function absoluut(href: string, basis: string): string | null {
@@ -233,7 +258,7 @@ export function contactSignals(page: PageInput): Signal[] {
   // site gezet" niet te onderscheiden van "nog niet geanalyseerd", en dat is
   // precies het moment waarop je gaat twijfelen of de app het wel doet.
   const delen: string[] = [];
-  if (contact.telefoons.length > 0) delen.push(contact.telefoons[0]);
+  if (contact.telefoons.length > 0) delen.push(contact.telefoons[0].weergave);
   if (contact.emails.length > 0) delen.push(contact.emails[0].adres);
   if (delen.length === 0 && contact.contactpagina) delen.push('alleen een contactformulier');
 

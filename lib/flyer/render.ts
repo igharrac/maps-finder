@@ -1,4 +1,4 @@
-import { chromium, type Browser } from 'playwright';
+import { BrowserUnavailableError, getBrowser } from '@/lib/browser';
 import { PAGE_H, PAGE_W, PX_PER_MM } from './template';
 
 /**
@@ -7,54 +7,20 @@ import { PAGE_H, PAGE_W, PX_PER_MM } from './template';
  * Chromium houdt tekst als vector in de PDF, dus er is geen dpi-grens zoals bij
  * een gerasterde export. Dat maakt het bestand ook klein genoeg om te mailen.
  *
- * De browser wordt hergebruikt tussen aanvragen: opstarten duurt een seconde of
- * twee en dat wil je niet per flyer betalen.
+ * De browser is gedeeld met de website-analyse; zie lib/browser.ts.
  */
-let browserPromise: Promise<Browser> | null = null;
-
-/**
- * Eerst Playwright's eigen Chromium. Lukt dat niet — bijvoorbeeld omdat
- * `npx playwright install` niet bij de download kon — dan de Chrome die al op
- * de machine staat. Dat scheelt een download van een paar honderd megabyte.
- */
-async function launch(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (first) {
-    try {
-      return await chromium.launch({ channel: 'chrome' });
-    } catch {
-      throw first;
-    }
-  }
-}
-
-async function getBrowser(): Promise<Browser> {
-  if (!browserPromise) {
-    browserPromise = launch().catch((error) => {
-      browserPromise = null;
-      throw error;
-    });
-  }
-  const browser = await browserPromise;
-  if (!browser.isConnected()) {
-    browserPromise = null;
-    return getBrowser();
-  }
-  return browser;
-}
 
 export class RenderError extends Error {}
 
 export async function renderPdf(html: string): Promise<Buffer> {
-  let browser: Browser;
+  let browser;
   try {
     browser = await getBrowser();
   } catch (error) {
     throw new RenderError(
-      'Geen browser gevonden om de PDF mee te maken. Draai eenmalig ' +
-        '`npx playwright install chromium`, of installeer Google Chrome. ' +
-        `Oorspronkelijke fout: ${error instanceof Error ? error.message : String(error)}`,
+      error instanceof BrowserUnavailableError
+        ? error.message
+        : `Geen browser gevonden om de PDF mee te maken: ${String(error)}`,
     );
   }
 
