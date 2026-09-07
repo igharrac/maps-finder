@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { normalizeStoredSignals } from '@/lib/flyer/signals';
 import { lookupPanden, PAND_FUNCTIE_LABEL } from '@/lib/locations/bag';
 import { PlacesError, searchGroups } from '@/lib/places/client';
 import { scorePlace } from '@/lib/scoring';
@@ -81,18 +82,49 @@ export async function POST(request: Request) {
 
     // Welke van deze bedrijven kennen we al? Voorkomt dat een bedrijf dat al
     // een flyer heeft gehad opnieuw als nieuw in de lijst verschijnt.
+    // Inclusief wat een eerdere analyse opleverde. Zonder dat verdween bij elke
+    // nieuwe zoekactie alles wat je al had uitgezocht: de bevindingen, de
+    // contactgegevens, en de vermelding dat de site überhaupt bekeken was. Het
+    // bedrijf stond dan op "Geanalyseerd" met een score die zichzelf een
+    // schatting noemde.
+    type KnownRow = {
+      id: string;
+      google_place_id: string;
+      status: string;
+      prospect_signals: Array<{
+        key: string;
+        kind: 'fact' | 'inference' | 'recommendation';
+        label: string;
+        value: unknown;
+        confidence: number;
+        detected_by: string;
+      }> | null;
+    };
+
     const placeIds = places.map((p) => p.placeId);
     const { data: known } = placeIds.length
       ? await supabase
           .from('prospects')
-          .select('id, google_place_id, status')
+          .select(
+            'id, google_place_id, status, prospect_signals(key, kind, label, value, confidence, detected_by)',
+          )
           .eq('owner_id', user.id)
           .in('google_place_id', placeIds)
-      : { data: [] as Array<{ id: string; google_place_id: string; status: string }> };
+      : { data: [] as KnownRow[] };
 
     const byPlaceId = new Map(
-      (known ?? []).map((row) => [row.google_place_id, row] as const),
+      ((known ?? []) as unknown as KnownRow[]).map((row) => [row.google_place_id, row] as const),
     );
+
+    // Deze signalen rekenen we hier vers uit; de opgeslagen versie is ouder en
+    // zou de nieuwe alleen maar dubbelen.
+    const VERS = new Set([
+      'review_volume',
+      'rating',
+      'category_fit',
+      'has_website',
+      'pand_functie',
+    ]);
 
     // Wat voor pand staat er op dit adres? Dit komt uit de BAG en is gratis,
     // dus het gebeurt voor elk resultaat en niet pas op verzoek. Het gaat
@@ -131,7 +163,11 @@ export async function POST(request: Request) {
             ]
           : [];
 
-      const score = scorePlace(place, undefined, extra);
+      const opgeslagen = normalizeStoredSignals(existing?.prospect_signals ?? []).filter(
+        (s) => !VERS.has(s.key),
+      );
+
+      const score = scorePlace(place, undefined, [...opgeslagen, ...extra]);
       const status = (existing?.status ?? 'discovered') as ProspectStatus;
 
       return {

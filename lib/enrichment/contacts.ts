@@ -229,20 +229,21 @@ export function extractContacts(page: PageInput): ContactDetails {
 export function contactSignals(page: PageInput): Signal[] {
   const contact = extractContacts(page);
 
-  const aantalMails = contact.emails.length;
-  const aantalNummers = contact.telefoons.length;
-  if (aantalMails === 0 && aantalNummers === 0 && !contact.contactpagina) return [];
-
+  // Ook als er niets gevonden is leggen we dat vast. Anders is "niets op de
+  // site gezet" niet te onderscheiden van "nog niet geanalyseerd", en dat is
+  // precies het moment waarop je gaat twijfelen of de app het wel doet.
   const delen: string[] = [];
-  if (aantalNummers > 0) delen.push(contact.telefoons[0]);
-  if (aantalMails > 0) delen.push(contact.emails[0].adres);
+  if (contact.telefoons.length > 0) delen.push(contact.telefoons[0]);
+  if (contact.emails.length > 0) delen.push(contact.emails[0].adres);
   if (delen.length === 0 && contact.contactpagina) delen.push('alleen een contactformulier');
 
   return [
     {
       key: 'contact_details',
       kind: 'fact',
-      label: `Contact: ${delen.join(' · ')}`,
+      label: delen.length
+        ? `Contact: ${delen.join(' · ')}`
+        : 'Geen contactgegevens op de site gevonden',
       value: contact,
       normalized: null,
       confidence: 0.9,

@@ -10,6 +10,7 @@
  */
 import assert from 'node:assert/strict';
 import {
+  contactSignals,
   extractContactpagina,
   extractContacts,
   extractEmails,
@@ -136,6 +137,31 @@ check('lege pagina levert lege gegevens, geen fout', () => {
   const c = extractContacts({ url: 'https://x.nl', status: 0, html: '', headers: {}, elapsedMs: 0 });
   assert.deepEqual(c.emails, []);
   assert.equal(c.contactpagina, null);
+});
+
+console.log('\nsignaal');
+
+const pagina = (html: string) => ({
+  url: 'https://kuiper.nl',
+  status: 200,
+  html,
+  headers: {},
+  elapsedMs: 100,
+});
+
+check('signaal vat het eerste nummer en adres samen', () => {
+  const [signal] = contactSignals(pagina('<a href="tel:0756128420">bel</a><a href="mailto:info@kuiper.nl">mail</a>'));
+  assert.equal(signal.label, 'Contact: 0756128420 · info@kuiper.nl');
+});
+
+check('niets gevonden levert toch een signaal, zodat het zichtbaar is', () => {
+  const [signal] = contactSignals(pagina('<p>Welkom bij Kuiper.</p>'));
+  assert.equal(signal.label, 'Geen contactgegevens op de site gevonden');
+});
+
+check('het signaal weegt nooit mee in de score', () => {
+  const [signal] = contactSignals(pagina('<a href="mailto:info@kuiper.nl">mail</a>'));
+  assert.equal(signal.normalized, null);
 });
 
 console.log(failures === 0 ? '\nAlles goed.' : `\n${failures} test(s) mislukt.`);

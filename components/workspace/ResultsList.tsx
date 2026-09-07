@@ -310,7 +310,14 @@ export function ResultsList({
                   contact.telefoons.length > 0 ||
                   contact.emails.length > 0 ||
                   contact.contactpagina;
-                if (!heeftIets) return null;
+
+                if (!heeftIets) {
+                  return (
+                    <p className="mt-2 rounded-md bg-surface-2 px-2 py-1.5 text-[11px] text-ink-3">
+                      Geen telefoonnummer of e-mailadres op de site gevonden
+                    </p>
+                  );
+                }
 
                 return (
                   <div className="mt-2 flex flex-col gap-1 rounded-md bg-surface-2 px-2 py-1.5 text-[11px]">
